@@ -1,20 +1,18 @@
 import matplotlib.pyplot as plt
+import numpy as np
 
-def create_2d_creature(eye_size: float = 1, num_legs: int = 20, leg_gap: float = 0.02):
+def create_2d_creature(eye_size: float = 1, num_legs: int = 20, num_arms:int=2, leg_gap: float = 0.02, arm_spread:float=0.5):
     if num_legs < 2:
         raise ValueError("The creature must have at least 2 legs.")
     
     fig, ax = plt.subplots()
     
-    # Calculate the total width of the legs plus gaps
     total_width = num_legs * 0.05 + (num_legs - 1) * leg_gap
     
-    # Calculate the initial horizontal position for the body
     initial_x = 0.5 - total_width / 2
     
-    # Widen the body to accommodate the legs
-    body_width = total_width + 0.1  # Adjust the body width as needed
-    
+    body_width = total_width + 0.1
+    background=plt.Rectangle((0, 0), 1, 1, color='grey', fill=True)
     body = plt.Rectangle((initial_x - 0.05, 0.2), body_width, 0.5, color='green', fill=True)
     head = plt.Circle((0.5, 0.7), 0.2, color='blue', fill=True)
     
@@ -38,6 +36,24 @@ def create_2d_creature(eye_size: float = 1, num_legs: int = 20, leg_gap: float =
         
     for leg in legs:
         ax.add_patch(leg)
+
+    angles = np.linspace(-arm_spread/2, arm_spread/2, num_arms)
+    
+    arms = []
+    
+    for angle in angles:
+        x = 0.5 + 0.15 * np.cos(angle)
+        y = 0.85 + 0.15 * np.sin(angle)
+        arms.append(plt.Rectangle((x, y), 0.05, -0.2, angle=angle*180/np.pi, color='brown', fill=True))
+    
+    #for arm in arms:
+    #    ax.add_patch(arm)
+    
+    
+
+    ax.add_patch(background)
+    for leg in legs:
+        ax.add_patch(leg)
     ax.add_patch(body)
     ax.add_patch(head)
     ax.add_patch(left_eye)
@@ -53,4 +69,4 @@ def create_2d_creature(eye_size: float = 1, num_legs: int = 20, leg_gap: float =
     plt.axis('off')
     plt.show()
 
-create_2d_creature(num_legs=2, leg_gap=0.02)
+create_2d_creature(eye_size=1.8,num_legs=2, leg_gap=0.02)

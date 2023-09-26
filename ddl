@@ -7,7 +7,6 @@ if os.path.exists('animal_database.db'):
     os.remove('animal_database.db')
 conn = sqlite3.connect('animal_database.db')
 
-
 class Terrain:
     def __init__(self):
         self.cursor = conn.cursor()
@@ -104,7 +103,7 @@ class Animals:
         self.cursor.execute('''
             INSERT INTO animals (name, num_legs, eye_size, mouth_size, weight, energy_capacity, endurance,
             num_teeth, avg_old_age, old_age, breeding_lifecycle, eye_injury, leg_injury, mouth_injury, general_injury, prey_relationships, terrain_id, birth_rate, litter_size, born, ear_size, ear_injury)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ear_injury)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (name, num_legs, eye_size, mouth_size, weight, energy_capacity, endurance, num_teeth, avg_old_age,
               old_age, breeding_lifecycle, eye_injury, leg_injury, mouth_injury, general_injury, json.dumps(prey_relationships), terrain_id, birth_rate, litter_size, born, ear_size, ear_injury))
 
@@ -259,7 +258,7 @@ class Animals:
         self.cursor.execute('SELECT eye_size, weight, endurance, terrain_id FROM animals WHERE id = ?', (animal_id,))
         animal_data = self.cursor.fetchone()
         eye_size, weight, endurance, terrain_id = animal_data
-        self.cursor.execute('SELECT vegetation_density from terrain WHERE id = ?', terrain_id)
+        self.cursor.execute('SELECT vegetation_density from terrain WHERE id = ?', (terrain_id,))
         vegetation=self.cursor.fetchone()[0]
         distance=weight*endurance*0.4*eye_size*self.get_age_modifier(animal_id)/(1+vegetation)
         return distance
@@ -269,10 +268,10 @@ class Animals:
         return self.cursor.fetchone()[0]
 
     def get_land_covered_in_day(self, animal_id)->float:
-        self.cursor.execute('SELECT eye_size, ear_size from Animals WHERE id = ?', (animal_id,))
+        self.cursor.execute('SELECT eye_size, eye_injury, ear_size, ear_injury from Animals WHERE id = ?', (animal_id,))
         eye_size, eye_injury, ear_size, ear_injury=self.cursor.fetchone()
         distance:float=self.get_distance_travelled_in_day(animal_id)
-        search_radius=max(ear_size/((1-ear_injury)/10), eye_size((1-eye_injury)/10))
+        search_radius=max(ear_size/((1-ear_injury)/10), eye_size/((1-eye_injury)/10))
         return distance*search_radius
 
     def get_encounter_odds_in_day(self, animal_id) -> float:
@@ -297,12 +296,122 @@ class Animals:
         animals_encountered:list[int]=self.cursor.fetchall()
         return animals_encountered
 
-    def does_see_animal(self, predator_id:int, prey_id:int)->(bool, bool):
-        self.cursor.execute('SELECT eye_size, weight, old_age, eye_injury, leg_injury, mouth_injury, general_injury, terrain_id, born, ear_size from Animals WHERE id = ?', predator_id)
-        predator_eye_size, predator_weight, predator_old_age, predator_eye_injury, predator_leg_injury, general_injury, terrain_id, born, ear_size=self.cursor.fetchone()
+    def get_does_see_animal(self, predator_id:int, prey_id:int)->(bool, bool):
+        self.cursor.execute('SELECT eye_size, weight, eye_injury, leg_injury, general_injury, terrain_id, ear_size, ear_injury from Animals WHERE id = ?', (predator_id,))
+        eye_size, weight, eye_injury, leg_injury, general_injury, terrain_id, ear_size, ear_injury=self.cursor.fetchone()
+        terrain_density=self.cursor.execute('SELECT vegetation_density from terrain WHERE id = ?', terrain_id)
+        predator_defense_score:float=((((eye_size*((10-eye_injury)/10)+(ear_size*((10-ear_injury)/10)))-((10-leg_injury)/10)*1.1)-(weight/1000))/(1+terrain_density))
+        predator_offense_score:float=predator_defense_score*((10-general_injury)/10)
+
+        self.cursor.execute('SELECT eye_size, weight, eye_injury, leg_injury, general_injury, terrain_id, ear_size, ear_injury from Animals WHERE id = ?', (prey_id,))
+        eye_size, weight, eye_injury, leg_injury, general_injury, terrain_id, ear_size, ear_injury=self.cursor.fetchone()
+        prey_defense_score:float=(((eye_size*((10-eye_injury)/10)+(ear_size*((10-ear_injury)/10)))-((10-leg_injury)/10)*0.8)-(weight/1000))/(1+terrain_density)
+        prey_offense_score:float=prey_defense_score*((10-general_injury)/10)
+        predator_offense_score=random.uniform(0.000, predator_offense_score)
+        prey_defense_score=random.uniform(0.000, prey_defense_score)
+        if(predator_offense_score>prey_defense_score):
+            prey_seen=True
+        else:
+            prey_seen=False
+        predator_defense_score=random.uniform(0.000, predator_defense_score)
+        prey_offense_score=random.uniform(0.000, prey_offense_score)
+        if(prey_offense_score>predator_defense_score):
+            predator_seen:bool=True
+        else:
+            predator_seen:bool=False
+        return (prey_seen, predator_seen)
+
+    def get_does_chase_animal(self, predator_id:int, prey_id:int)->bool:
+        self.cursor.execute('SELECT prey_relationships, weight FROM Animals WHERE id = ?', (predator_id,))
+        prey_relationships, weight = self.cursor.fetchone()
+        self.cursor.execute('SELECT name, weight FROM Animals WHERE id = ?', (prey_id,))
+        name,prey_weight=self.cursor.fetchone()
+        if(name in prey_relationships.split(',')):
+            will_chase=True
+        else:
+            weight=random.uniform(0.000, weight)
+            prey_weight=random.uniform(0.000, prey_weight)
+            if(weight>prey_weight):
+                will_chase=True
+            else:
+                will_chase=False
+        return will_chase
+
+    def get_does_catch_animal(self, predator_id:int, prey_id:int)->bool:
+        self.cursor.execute('SELECT num_legs, weight, energy_capacity, endurance, leg_injury, general_injury, terrain_id FROM Animals WHERE id = ?', (predator_id,))
+        num_legs, weight, energy_capacity, endurance, leg_injury, general_injury, terrain_id=self.cursor.fetchone()
+        self.cursor.execute('SELECT vegetation_density FROM terrain WHERE id = ?', (terrain_id,))
+        vegetation_density=self.cursor.fetchone()
+        predator_score=((((num_legs^0.5)*energy_capacity)/(weight*((20-leg_injury-general_injury)/20)))*endurance)/(1+vegetation_density)
+        self.cursor.execute('SELECT num_legs, weight, energy_capacity, endurance, leg_injury, general_injury FROM Animals WHERE id = ?', (prey_id,))
+        num_legs, weight, energy_capacity, endurance, leg_injury, general_injury = self.cursor.fetchone()
+        prey_score=((((num_legs^0.5)*energy_capacity)/(weight*((20-leg_injury-general_injury)/20)))*endurance)/(1+vegetation_density)
+        predator_score=random.uniform(predator_score/2.00, predator_score)
+        prey_score=random.uniform(prey_score/2.00, prey_score)
+        catches_prey:bool
+        if(predator_score>prey_score):
+            catches_prey=True
+        else:
+            catches_prey=False
+        return catches_prey
+
+    def get_combat_outcome(self, predator_id:int, prey_id:int)->float:
+        predator_age=self.get_age_modifier(predator_id)
+        prey_age=self.get_age_modifier(prey_id)
+        self.cursor.execute('SELECT num_legs, mouth_size, weight, energy_capacity, endurance, num_teeth')
+        num_legs, mouth_size, weight, energy_capacity, endurance, num_teeth = self.cursor.fetchone()
+        predator_score:float = random.uniform(0.00, (num_legs**0.5)*mouth_size*(num_teeth**1.1)*(endurance^0.9)*(energy_capacity**0.9)*(weight**0.5))
+        prey_score:float = random.uniform(0.00, (num_legs**0.55)*(mouth_size**0.9)*(num_teeth**0.9)*(endurance**1.1)*energy_capacity*(weight**0.5))
+        outcome = predator_score-prey_score
+        if(abs(outcome)>0.1 and abs(outcome)<0.7):
+            injury_types=["eye", "leg", "mouth", "ear", "general"]
+            injury_roll=random.randint(0, len(injury_types)-1)
+            if(outcome>0):
+                victim=prey_id
+            else:
+                victim=predator_id
+            self.cursor.execute('SELECT ? FROM Animals WHERE id = ?', (injury_types[injury_roll]+"_injury",victim,))
+            injury=self.cursor.fetchone()
+            if((injury+outcome)<10):
+                injury=injury+outcome
+            else:
+                injury=10
+            self.cursor.execute('UPDATE Animals SET eye_injury = ? WHERE id = ?', (injury_types[injury_roll]+"_injury",victim,))
+            return outcome
+        elif(abs(outcome)>=0.7):
+            if(outcome>0):
+                victim=prey_id
+            else:
+                victim=predator_id
+            self.cursor.execute('DELLETE FROM Animals WHERE id = ?', (victim))
+        return outcome
+
+    def execute_interaction(self, predator_id:int, prey_id:int):
+        self.cursor.execute('SELECT name FROM Animals WHERE id = ?', (predator_id,))
+        predator_name=self.cursor.fetchone()
+        self.cursor.execute('SELECT name FROM Animals WHERE id = ?', (prey_id,))
+        prey_name=self.cursor.fetchone()
+        status:str=f"No interaction eventuated between {predator_name} and {prey_name}"
+        chase_decision=self.get_does_chase_animal(predator_id, prey_id)
+        if(chase_decision==(True,True)):
+            status=f"A fight ensued between {predator_name} and {prey_name}"
+            self.get_combat_outcome(predator_id, prey_id)
+        elif(chase_decision==(True,False)):
+            status=f"A chase ensued between {predator_name} and {prey_name}. "
+            if(self.get_does_catch_animal(predator_id, prey_id)):
+                status+="The animal was caught."
+                self.get_combat_outcome(predator_id, prey_id)
+            else:
+                status+="The animal got away."
+        elif(chase_decision==(False, True)):
+            status=f"Prey fought back: {predator_name} and {prey_name}. "
+            if(self.get_does_catch_animal(prey_id, predator_id)):
+                status+= "successful catch"
+                self.get_combat_outcome(prey_id, predator_id)
 
 ## EXAMPLE USAGE ##
 
+##TODO: create json file for terrain
 # Creating a Terrain
 terrain_manager = Terrain()
 terrain_manager.create_new_terrain(
@@ -318,86 +427,14 @@ terrain_manager.create_new_terrain(
 # Creating Animals in the Forest
 animal_manager = Animals()
 
-# Creating a Deer in the Forest
-animal_manager.create_new_animal(
-    name="Deer",
-    num_legs=4,
-    eye_size=5.0,
-    mouth_size=3.0,
-    weight=150.0,
-    energy_capacity=800.0,
-    endurance=50.0,
-    num_teeth=32,
-    avg_old_age=8.0,
-    old_age=10.0,
-    breeding_lifecycle=2.0,
-    eye_injury=0,  # 0 indicates no eye injury
-    leg_injury=0,  # 0 indicates no leg injury
-    mouth_injury=0,  # 0 indicates no mouth injury
-    general_injury=0,  # 0 indicates no general injury
-    prey_relationships=["Grass"],
-    terrain_id=1, 
-    birth_rate=1,
-    litter_size=4,
-    born=0,
-    ear_size=4,
-    ear_injury=0
-)
+with open("Animals.json", "r") as json_file:
+    data=json.load(json_file)
 
-# Creating a Wolf in the Forest
-wolf_bear_id=animal_manager.create_new_animal(
-    name="Wolf",
-    num_legs=4,
-    eye_size=6.0,
-    mouth_size=4.0,
-    weight=80.0,
-    energy_capacity=1000.0,
-    endurance=60.0,
-    num_teeth=42,
-    avg_old_age=7.0,
-    old_age=9.0,
-    breeding_lifecycle=3.0,
-    eye_injury=0,  # 0 indicates no eye injury
-    leg_injury=0,  # 0 indicates no leg injury
-    mouth_injury=0,  # 0 indicates no mouth injury
-    general_injury=0,  # 0 indicates no general injury
-    prey_relationships=["Deer"],
-    terrain_id=1, 
-    birth_rate=0.5,
-    litter_size=2,
-    born=0,
-    ear_size=4,
-    ear_injury=0
-)
-
-# Creating a Bear in the Forest
-animal_manager.create_new_animal(
-    name="Bear",
-    num_legs=4,
-    eye_size=7.0,
-    mouth_size=5.0,
-    weight=250.0,
-    energy_capacity=1200.0,
-    endurance=70.0,
-    num_teeth=38,
-    avg_old_age=12.0,
-    old_age=15.0,
-    breeding_lifecycle=5.0,
-    eye_injury=0,  # 0 indicates no eye injury
-    leg_injury=0,  # 0 indicates no leg injury
-    mouth_injury=0,  # 0 indicates no mouth injury
-    general_injury=0,  # 0 indicates no general injury
-    prey_relationships=["Deer"],
-    terrain_id=1, 
-    birth_rate=0.2,
-    litter_size=1,
-    born=0,
-    ear_size=4,
-    ear_injury=0
-)
+animal_data=data["Deer"]
+animal_manager.create_new_animal(**animal_data)
 
 # Creating a Child Animal in the Forest (Hybrid of Wolf and Bear)
-animal_manager.create_child_animal(parent1_id=3, parent2_id=4)  
+#animal_manager.create_child_animal(parent1_id=3, parent2_id=2)  
 
 # Retrieving Animal Attributes
 deer_attributes = animal_manager.get_animal_attributes(1)
@@ -407,8 +444,9 @@ child_attributes = animal_manager.get_animal_attributes(5)
 
 # Retrieving Terrain Attributes
 forest_attributes = terrain_manager.get_terrain_attributes(1)
-
-print(animal_manager.get_encounter_odds_in_day(wolf_bear_id))
-enconters_for_animal=animal_manager.get_encounters_in_day(wolf_bear_id)
+animal_id=wolf_bear_id
+print(animal_manager.get_encounter_odds_in_day(animal_id))
+enconters_for_animal=animal_manager.get_encounters_in_day(animal_id)
 for encounter in enconters_for_animal:
-    print(animal_manager.get_species(encounter[0]))
+    animal_manager.execute_interaction(animal_id, encounter[0])
+#print(animal_manager.get_does_see_animal(1,2))

@@ -92,7 +92,6 @@ class Animals:
     def this_year(self, year):
         self.__this_year=year
 
-
     def create_new_animal(self, name, num_legs, eye_size, mouth_size, weight, energy_capacity, endurance,
                           num_teeth, avg_old_age, old_age, breeding_lifecycle, eye_injury, leg_injury, mouth_injury, general_injury, prey_relationships,
                           terrain_id, birth_rate, litter_size, born, ear_size, ear_injury):
@@ -383,6 +382,7 @@ class Animals:
             self.cursor.execute('DELLETE FROM Animals WHERE id = ?', (victim))
         return outcome
 
+    ##TODO: Chase decision is returning bool, but being treated like (bool, bool)
     def execute_interaction(self, predator_id:int, prey_id:int):
         self.cursor.execute('SELECT name FROM Animals WHERE id = ?', (predator_id,))
         predator_name=self.cursor.fetchone()
@@ -390,6 +390,7 @@ class Animals:
         prey_name=self.cursor.fetchone()
         status:str=f"No interaction eventuated between {predator_name} and {prey_name}. "
         chase_decision=self.get_does_chase_animal(predator_id, prey_id)
+        print(chase_decision)
         if(chase_decision==(True,True)):
             status=f"A fight ensued between {predator_name} and {prey_name}"
             self.get_combat_outcome(predator_id, prey_id)
@@ -419,7 +420,6 @@ def load_json_data(path):
     with open(path, "r") as json_data:
         data=json.load(json_data)
         return data
-
 
 # Creating a Terrain
 terrain_manager = Terrain()

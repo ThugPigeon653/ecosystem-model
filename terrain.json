@@ -1,0 +1,10 @@
+{
+    "Forest": {
+        "name":"Forest",
+        "temperature":25.0,
+        "precipitation":100.0,
+        "vegetation_density":0.8,
+        "terrain_type":"Forest",
+        "area":250
+    }
+}

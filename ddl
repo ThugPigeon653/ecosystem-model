@@ -18,18 +18,16 @@ class Terrain:
                 precipitation REAL,
                 vegetation_density REAL,
                 terrain_type TEXT,
-                animal_population TEXT,
                 area REAL
             )
         ''')
         conn.commit()
 
-    def create_new_terrain(self, name, temperature, precipitation, vegetation_density, terrain_type, animal_population, area):
-        animal_population_json = json.dumps(animal_population) if animal_population is not None else None
+    def create_new_terrain(self, name, temperature, precipitation, vegetation_density, terrain_type, area):
         self.cursor.execute('''
-            INSERT INTO terrain (name, temperature, precipitation, vegetation_density, terrain_type, animal_population, area)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        ''', (name, temperature, precipitation, vegetation_density, terrain_type, animal_population_json, area))
+            INSERT INTO terrain (name, temperature, precipitation, vegetation_density, terrain_type, area)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (name, temperature, precipitation, vegetation_density, terrain_type, area))
         conn.commit()
         return self.cursor.lastrowid
 
@@ -37,9 +35,7 @@ class Terrain:
         self.cursor.execute('SELECT * FROM terrain WHERE id = ?', (terrain_id,))
         terrain_data = self.cursor.fetchone()
         if terrain_data:
-            id, name, temperature, precipitation, vegetation_density, terrain_type, animal_population_json, area = terrain_data
-
-            animal_population = json.loads(animal_population_json) if animal_population_json else None
+            id, name, temperature, precipitation, vegetation_density, terrain_type, area = terrain_data
 
             return {
                 'id': id,
@@ -48,7 +44,7 @@ class Terrain:
                 'precipitation': precipitation,
                 'vegetation_density': vegetation_density,
                 'terrain_type': terrain_type,
-                'animal_population': animal_population
+                'area': area
             }
         else:
             return None
@@ -411,27 +407,24 @@ class Animals:
 
 ## EXAMPLE USAGE ##
 
+def load_json_data(path):
+    with open(path, "r") as json_data:
+        data=json.load(json_data)
+        return data
+
+
 ##TODO: create json file for terrain
 # Creating a Terrain
 terrain_manager = Terrain()
-terrain_manager.create_new_terrain(
-    name="Forest",
-    temperature=25.0,
-    precipitation=100.0,
-    vegetation_density=0.8,
-    terrain_type="Forest",
-    animal_population=["Deer", "Bear", "Wolf"],
-    area=250
-)
+terrain_data=load_json_data("terrain.json")
+terrain_id=terrain_manager.create_new_terrain(**terrain_data["Forest"])
 
 # Creating Animals in the Forest
 animal_manager = Animals()
-
-with open("Animals.json", "r") as json_file:
-    data=json.load(json_file)
-
-animal_data=data["Deer"]
-animal_manager.create_new_animal(**animal_data)
+animal_data=load_json_data("animals.json")
+deer_data=animal_data["Deer"]
+deer_data["terrain_id"]=terrain_id
+animal_manager.create_new_animal(**deer_data)
 
 # Creating a Child Animal in the Forest (Hybrid of Wolf and Bear)
 #animal_manager.create_child_animal(parent1_id=3, parent2_id=2)  
@@ -444,8 +437,6 @@ child_attributes = animal_manager.get_animal_attributes(5)
 
 # Retrieving Terrain Attributes
 forest_attributes = terrain_manager.get_terrain_attributes(1)
-animal_id=wolf_bear_id
-print(animal_manager.get_encounter_odds_in_day(animal_id))
 enconters_for_animal=animal_manager.get_encounters_in_day(animal_id)
 for encounter in enconters_for_animal:
     animal_manager.execute_interaction(animal_id, encounter[0])

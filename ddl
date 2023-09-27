@@ -197,7 +197,7 @@ class Animals:
 
         animals_list = []
         for animal_data in all_animals:
-            id, name, num_legs, eye_size, mouth_size, weight, energy_capacity, endurance, num_teeth, avg_old_age, old_age, breeding_lifecycle, eye_injury, leg_injury, mouth_injury, general_injury, prey_relationships_json, terrain_id, birth_rate, litter_size, born, ear_size = animal_data
+            id, name, num_legs, eye_size, mouth_size, weight, energy_capacity, endurance, num_teeth, avg_old_age, old_age, breeding_lifecycle, eye_injury, leg_injury, mouth_injury, general_injury, prey_relationships_json, terrain_id, birth_rate, litter_size, born, ear_size, ear_injury = animal_data
 
             prey_relationships = json.loads(prey_relationships_json) if prey_relationships_json else None
 
@@ -218,7 +218,8 @@ class Animals:
                     'eye_injury': eye_injury,
                     'leg_injury': leg_injury,
                     'mouth_injury': mouth_injury,
-                    'general_injury': general_injury
+                    'general_injury': general_injury,
+                    'ear_injury':ear_injury
                 },
                 'prey_relationships': prey_relationships,
                 'terrain_id': terrain_id,
@@ -387,7 +388,7 @@ class Animals:
         predator_name=self.cursor.fetchone()
         self.cursor.execute('SELECT name FROM Animals WHERE id = ?', (prey_id,))
         prey_name=self.cursor.fetchone()
-        status:str=f"No interaction eventuated between {predator_name} and {prey_name}"
+        status:str=f"No interaction eventuated between {predator_name} and {prey_name}. "
         chase_decision=self.get_does_chase_animal(predator_id, prey_id)
         if(chase_decision==(True,True)):
             status=f"A fight ensued between {predator_name} and {prey_name}"
@@ -404,6 +405,13 @@ class Animals:
             if(self.get_does_catch_animal(prey_id, predator_id)):
                 status+= "successful catch"
                 self.get_combat_outcome(prey_id, predator_id)
+        else:
+            status += "There was no interest. "
+        return status
+
+    def get_feeding_order(self):
+        self.cursor.execute('SELECT id FROM Animals ORDER BY RANDOM()')
+        return self.cursor.fetchall()
 
 ## EXAMPLE USAGE ##
 
@@ -413,31 +421,32 @@ def load_json_data(path):
         return data
 
 
-##TODO: create json file for terrain
 # Creating a Terrain
 terrain_manager = Terrain()
 terrain_data=load_json_data("terrain.json")
 terrain_id=terrain_manager.create_new_terrain(**terrain_data["Forest"])
-
 # Creating Animals in the Forest
 animal_manager = Animals()
 animal_data=load_json_data("animals.json")
-deer_data=animal_data["Deer"]
-deer_data["terrain_id"]=terrain_id
-animal_manager.create_new_animal(**deer_data)
-
-# Creating a Child Animal in the Forest (Hybrid of Wolf and Bear)
-#animal_manager.create_child_animal(parent1_id=3, parent2_id=2)  
+animals=["Deer", "Wolf", "Bear", "Lion", "Rabbit", "Fox"]
+for animal in animals:
+    data=animal_data[animal]
+    animal_data["terrain_id"]=terrain_id
+    i=0
+    while i<10:
+        print("created "+animal)
+        animal_manager.create_new_animal(**data)
+        i+=1
 
 # Retrieving Animal Attributes
-deer_attributes = animal_manager.get_animal_attributes(1)
-wolf_attributes = animal_manager.get_animal_attributes(2)
-bear_attributes = animal_manager.get_animal_attributes(3)
-child_attributes = animal_manager.get_animal_attributes(5)  
-
-# Retrieving Terrain Attributes
-forest_attributes = terrain_manager.get_terrain_attributes(1)
-enconters_for_animal=animal_manager.get_encounters_in_day(animal_id)
-for encounter in enconters_for_animal:
-    animal_manager.execute_interaction(animal_id, encounter[0])
-#print(animal_manager.get_does_see_animal(1,2))
+i=0
+while i<1000:
+    animal_manager.this_year=i
+    print("-")
+    print(animal_manager.get_feeding_order())
+    for animal_id in animal_manager.get_feeding_order():
+        encounters_for_animal=animal_manager.get_encounters_in_day(animal_id[0])
+        print(encounters_for_animal)
+        for encounter in encounters_for_animal:
+            print(animal_manager.execute_interaction(animal_id[0], encounter[0]))
+    i+=1

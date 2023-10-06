@@ -211,7 +211,7 @@ class Animals:
 
         animals_list = []
         for animal_data in all_animals:
-            id, name, num_legs, eye_size, mouth_size, weight, energy_capacity, endurance, num_teeth, avg_old_age, old_age, breeding_lifecycle, eye_injury, leg_injury, mouth_injury, general_injury, prey_relationships_json, terrain_id, birth_rate, litter_size, born, ear_size, ear_injury = animal_data
+            id, name, num_legs, eye_size, mouth_size, weight, energy_capacity, endurance, num_teeth, avg_old_age, old_age, breeding_lifecycle, eye_injury, leg_injury, mouth_injury, general_injury, prey_relationships_json, terrain_id, birth_rate, litter_size, born, ear_size, ear_injury, is_male = animal_data
 
             prey_relationships = json.loads(prey_relationships_json) if prey_relationships_json else None
 
@@ -240,7 +240,8 @@ class Animals:
                 'birth_rate': birth_rate,
                 'litter_size': litter_size,
                 'born':born,
-                'ear_size':ear_size
+                'ear_size':ear_size,
+                'is_male':is_male
             }
             animals_list.append(animal)
 
@@ -378,7 +379,6 @@ class Animals:
             catches_prey=False
         return catches_prey
 
-    ##TODO: fix select statement
     def get_combat_outcome(self, predator_id:int, prey_id:int)->str:
         outcome:float=False
         return_value=None

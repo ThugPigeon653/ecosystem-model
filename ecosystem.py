@@ -1,3 +1,6 @@
+#TODO: 
+# - calculate odds of pregnancy, and birth. As it stands, all interactions with a posssible birth do result in birth
+# - implement mutation 
 import sqlite3
 import json
 import random
@@ -488,13 +491,18 @@ for animal in animals:
 
 # Retrieving Animal Attributes
 i=0
-while i<1000:
-    animal_manager.this_year=i
-    for animal_id in animal_manager.get_feeding_order():
-        encounters_for_animal=animal_manager.get_encounters_in_day(animal_id[0])
-        for encounter in encounters_for_animal:
-            interaction=animal_manager.execute_interaction(animal_id[0], encounter[0])
-            if(interaction!=None):
-                print(str(i)+" "+interaction)
-    print(animal_manager.get_all_animals())
-    i+=1
+try:
+    while i<1000:
+        animal_manager.this_year=i
+        for animal_id in animal_manager.get_feeding_order():
+            encounters_for_animal=animal_manager.get_encounters_in_day(animal_id[0])
+            for encounter in encounters_for_animal:
+                interaction=animal_manager.execute_interaction(animal_id[0], encounter[0])
+                if(interaction!=None):
+                    print(str(i)+" "+interaction)
+        print(animal_manager.get_all_animals())
+        i+=1
+
+finally:
+    conn.close()
+    print("Database connection closed.")

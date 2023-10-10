@@ -5,10 +5,11 @@ import sqlite3
 import json
 import random
 import os
+from db_connection import Connection
 
 if os.path.exists('animal_database.db'):
     os.remove('animal_database.db')
-conn = sqlite3.connect('animal_database.db')
+conn = Connection.get_connection()
 
 class Terrain:
     def __init__(self):
@@ -21,16 +22,17 @@ class Terrain:
                 precipitation REAL,
                 vegetation_density REAL,
                 terrain_type TEXT,
-                area REAL
+                area REAL,
+                color TEXT
             )
         ''')
         conn.commit()
 
-    def create_new_terrain(self, name, temperature, precipitation, vegetation_density, terrain_type, area):
+    def create_new_terrain(self, name, temperature, precipitation, vegetation_density, terrain_type, area, color):
         self.cursor.execute('''
-            INSERT INTO terrain (name, temperature, precipitation, vegetation_density, terrain_type, area)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ''', (name, temperature, precipitation, vegetation_density, terrain_type, area))
+            INSERT INTO terrain (name, temperature, precipitation, vegetation_density, terrain_type, area, color)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (name, temperature, precipitation, vegetation_density, terrain_type, area, color))
         conn.commit()
         return self.cursor.lastrowid
 
@@ -475,17 +477,25 @@ def load_json_data(path):
 
 # Creating a Terrain
 terrain_manager = Terrain()
-terrain_data=load_json_data("terrain.json")
-terrain_id=terrain_manager.create_new_terrain(**terrain_data["Forest"])
+terrain_data = load_json_data("terrain.json")
+
+biomes:list[int]=[]
+for terrain_name, terrain_attributes in terrain_data.items():
+    terrain_id = terrain_manager.create_new_terrain(**terrain_attributes)
+    biomes.append(terrain_id)
 # Creating Animals in the Forest
 animal_manager = Animals()
 animal_data=load_json_data("animals.json")
 animals=["Deer", "Wolf", "Bear", "Lion", "Rabbit", "Fox"]
 for animal in animals:
+    
+    
     data=animal_data[animal]
-    animal_data["terrain_id"]=terrain_id
+    
     i=0
     while i<50:
+        terrain_id=biomes[random.randint(0,len(biomes)-1)]
+        data["terrain_id"]=terrain_id
         animal_manager.create_new_animal(**data)
         i+=1
 

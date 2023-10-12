@@ -400,7 +400,9 @@ class Island():
 
                 # Find the color of the opaque segment
                 opaque_segment_color = np.mean(split_color_area[feature_mask, :3], axis=0).astype(int)
-
+                #TODO: Move logic from method above for terrain.json. Use this colour for __map_color and the method below, to ensure unique/consistent terrain. 
+                #      Check how ui.py prints the region currently being clicked ... make sure that the id of each json entry (index) is being assigned in 
+                #      a compatible way to how it is being read (see print statement in ui.py)
                 # Printing the color
                 print(f"Color: {opaque_segment_color}")
 

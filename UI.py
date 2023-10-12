@@ -4,12 +4,6 @@ from PyQt5.QtWidgets import QApplication, QWidget
 from PyQt5.QtGui import QPixmap, QPainter
 from PyQt5.QtCore import Qt, QPoint
 from PyQt5.QtWidgets import QDesktopWidget 
-import world_visualizer
-import sys
-import os
-
-
-import world_visualizer
 
 class CustomWidget(QWidget):
     def __init__(self, background_path, overlay_folder):
@@ -31,27 +25,39 @@ class CustomWidget(QWidget):
         self.background_image = self.background_image.scaled(screen.width(), screen.height(), Qt.KeepAspectRatio)
         self.setFixedSize(screen.width(), screen.height())
         self.setMouseTracking(True)
+        
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.drawPixmap(QPoint(0, 0), self.background_image)
         for i, overlay_image in enumerate(self.overlay_images):
             overlay_image = overlay_image.scaled(self.background_image.size())
             painter.drawPixmap(self.overlay_positions[i], overlay_image)
-
+    
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
+            # Calculate the click position in terms of the terrain
+            terrain_size = self.background_image.size()
+            click_pos = QPoint(
+                int(event.x() * (terrain_size.width() / self.width())),
+                int(event.y() * (terrain_size.height() / self.height()))
+            )
+            
+            # Identify the specific region of the terrain that was clicked
             for i, overlay_position in enumerate(self.overlay_positions):
                 overlay_image = self.overlay_images[i]
-                if overlay_image.rect().contains(event.pos()):
-                    pixel_color = overlay_image.toImage().pixel(event.pos())
+                if overlay_image.rect().contains(click_pos):
+                    pixel_color = overlay_image.toImage().pixel(click_pos)
                     alpha = (pixel_color >> 24) & 0xFF
+                    print(f"Clicked on overlay image {i + 1} || color: {pixel_color}, alpha: {alpha}")
                     if alpha != 0:
-                        print(f"Clicked on overlay image {i + 1}")
-
+                        print(f"Clicked on a non-transparent part of overlay image {i + 1}")
+   
 if __name__ == "__main__":
     #world_visualizer.Island()
+    #world_visualizer.MapUtils().draw_ocean()
     app = QApplication(sys.argv)
-    background_path = "color_blocks/color_block_1.png"
+    #background_path = "color_blocks/color_block_1.png"
+    background_path ="img/ocean/0.png"
     overlay_folder = "split_color_blocks"
     window = CustomWidget(background_path, overlay_folder)
     window.showFullScreen()

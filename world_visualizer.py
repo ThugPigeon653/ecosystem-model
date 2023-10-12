@@ -20,6 +20,7 @@ import os
 class Island():
     __map_path:str=None
     __outline=None
+    __color_map:{}={}
     def __init__(self) -> None:
         self.__map_path="img/map"
         turtle.setup(1100,1100)
@@ -235,8 +236,9 @@ class Island():
                     land_mask.append((xpix, ypix))
                     voronoi_color = noise_image[xpix, ypix]
 
-                    # Modify the mixed_color as needed
-                    mixed_color = ((original_image[xpix, ypix] * 2) + voronoi_color) // 2
+                    mixing_factor = 0.6  
+
+                    mixed_color = ((original_image[xpix, ypix] * (1 - mixing_factor)) + voronoi_color * mixing_factor).astype(np.uint8)
                     original_image[xpix, ypix] = mixed_color
 
         self.__outline = list.copy(land_mask)
@@ -296,13 +298,72 @@ class Island():
         non_bw_mask = np.any((original_image != 0) & (original_image != 255), axis=-1)
         labeled_mask, num_features = ndimage.label(non_bw_mask)
         os.makedirs("color_blocks", exist_ok=True)
+        terrain_data = {}  # Initialize the terrain data dictionary
+        color_map = {}  # Initialize the color-to-biome mapping
+        with open("terrain-archetypes.json", "r") as archetype_file:
+            archetype_data = json.load(archetype_file)
+        archetype_names = list(archetype_data.keys())
+
         for i in range(1, num_features + 1):
             feature_mask = labeled_mask == i
             color_block = np.zeros_like(original_image)
             color_block[feature_mask] = original_image[feature_mask]
-            color_block_image = Image.fromarray(color_block)
+            color_block_image = Image.fromarray(color_block)  # Convert to Image
             block_path = os.path.join("color_blocks", f"color_block_{i}.png")
             color_block_image.save(block_path)
+
+            # Construct terrain data for this color block
+            color_block_array = np.array(color_block_image)  # Convert to NumPy array
+            unique_colors = np.unique(color_block_array.reshape(-1, color_block_array.shape[2]), axis=0)
+            for color in unique_colors:
+                color_mask = np.all(color_block_array == color, axis=-1)
+                labeled_mask, num_features = ndimage.label(color_mask)
+
+                # Assign a biome name based on the color
+                color_key = f"{color[0]},{color[1]},{color[2]}"
+                if color_key in color_map:
+                    # If the color is in the mapping, use the corresponding biome name
+                    archetype_color = color_map[color_key]
+                else:
+                    # If the color isn't in the mapping, assign a biome name
+                    archetype_color = archetype_names[len(terrain_data) % len(archetype_names)]
+                    color_map[color_key] = archetype_color
+
+                # Construct the terrain entry for each unique region
+                for j in range(1, num_features + 1):
+                    feature_mask = labeled_mask == j
+                    land_size = int(np.sum(feature_mask))
+                    if land_size >= 200:
+                        # Create a unique key for each biome entry
+                        key = f"{archetype_color}_{j}"
+                        if key in terrain_data:
+                            # If the key already exists, update the existing dictionary
+                            terrain_data[key].update({
+                                "name": archetype_data[archetype_color]["name"],
+                                "temperature": int(archetype_data[archetype_color]["temperature"]),
+                                "precipitation": int(archetype_data[archetype_color]["precipitation"]),
+                                "vegetation_density": int(archetype_data[archetype_color]["vegetation_density"]),
+                                "terrain_type": archetype_color,
+                                "area": land_size,
+                                "color": color[:3].tolist()
+                            })
+                        else:
+                            # If the key doesn't exist, create a new dictionary entry
+                            terrain_data[key] = {
+                                "name": archetype_data[archetype_color]["name"],
+                                "temperature": int(archetype_data[archetype_color]["temperature"]),
+                                "precipitation": int(archetype_data[archetype_color]["precipitation"]),
+                                "vegetation_density": int(archetype_data[archetype_color]["vegetation_density"]),
+                                "terrain_type": archetype_color,
+                                "area": land_size,
+                                "color": color[:3].tolist()
+                            }
+
+        # Save the terrain data to a JSON file
+        with open('terrain.json', 'w') as json_file:
+            json.dump(terrain_data, json_file, indent=4)
+
+
     
     def split_color_block_by_color(self, image_path="color_blocks/color_block_1.png"):
         with Image.open(image_path) as im:
@@ -319,15 +380,18 @@ class Island():
                     os.unlink(file_path)
             except Exception as e:
                 print(f"Failed to delete {file_path}: {e}")
-
+        with open("terrain-archetypes.json", "r") as archetype_file:
+            archetype_data = json.load(archetype_file) 
+        archetype_names = list(archetype_data.keys())
         i = 0  # Counter for i
         for color in unique_colors:
             color_mask = np.all(color_block_image == color, axis=-1)
             labeled_mask, num_features = ndimage.label(color_mask)
+            self.__color_map[self.color_to_string(color)] = archetype_names[i % len(archetype_names)]
             j = 0  # Counter for j
             for j in range(1, num_features + 1):
                 feature_mask = labeled_mask == j
-                if np.sum(feature_mask) < 200:  # Check if the area is less than 200 pixels
+                if np.sum(feature_mask) < 200 or (j==1 and i==0):  # Check if the area is less than 200 pixels
                     continue
                 split_color_area = np.zeros((color_block_image.shape[0], color_block_image.shape[1], 4), dtype=np.uint8)
                 split_color_area[feature_mask, :3] = color_block_image[feature_mask]
@@ -351,6 +415,12 @@ class Island():
                 split_area_image.save(block_path)
                 j += 1  # Increment j for the next fragment
             i += 1  # Increment i for the next color
+
+
+    @staticmethod
+    def color_to_string(color):
+        return f"{color[0]},{color[1]},{color[2]}"
+   
 
     # Worth doing? some kind of post-process is needed. The image is generated in low res.
     def scale_images_in_folder(self, folder_path):
@@ -383,6 +453,43 @@ class Island():
                     
                     # Save the scaled image back to the same location
                     img.save(file_path)
+
+class MapUtils():
+    def draw_ocean(self):
+        width,height=Image.open("img/map.png").size
+        image = Image.new('RGB', (width, height), 'black')
+        draw = ImageDraw.Draw(image)
+        for _ in range(4000):  # Increase the number of waves for chaos
+            x = random.randint(0, width)
+            y = random.randint(0, height)  # Allow waves at any height
+            wave_size = random.randint(60, 60)  # Vary the size of the waves
+            wave_color = (0, 0, random.randint(0, 80))  # Vary the shade of blue
+            draw.ellipse((x, y, x + wave_size, y + wave_size), fill=wave_color)
+        wavy_image = Image.new('RGB', (width, height))
+        for x in range(width):
+            for y in range(height):
+                angle = math.sin(2 * math.pi * x / 60)  # Adjust the frequency and amplitude
+                new_x = int(x + 20 * angle)
+                if 0 <= new_x < width:
+                    pixel = image.getpixel((new_x, y))
+                    wavy_image.putpixel((x, y), pixel)
+        def create_distortion_pattern(width, height):
+            distortion_image = Image.new('RGB', (width, height))
+            draw = ImageDraw.Draw(distortion_image)
+            for x in range(width):
+                for y in range(height):
+                    offset_x = int(10 * math.sin(2 * math.pi * x / 40))
+                    offset_y = int(10 * math.sin(2 * math.pi * y / 40))
+                    if 0 <= x + offset_x < width and 0 <= y + offset_y < height:
+                        pixel = wavy_image.getpixel((x + offset_x, y + offset_y))
+                        pixel = tuple(int(val * 0.2) for val in pixel)
+                        distortion_image.putpixel((x, y), pixel)
+            return distortion_image
+        
+        
+        distortion_pattern = create_distortion_pattern(width, height)
+        result_image = Image.blend(wavy_image, distortion_pattern, alpha=0.5)
+        result_image.save("img/ocean/"+str(0)+'.png')
 
 class AnimalData():
     @staticmethod
@@ -425,6 +532,3 @@ class AnimalData():
         finally:
             conn.close()
             print("Database connection closed.")
-
-    
-Island()

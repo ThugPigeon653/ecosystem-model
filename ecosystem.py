@@ -30,9 +30,9 @@ class Terrain:
 
     def create_new_terrain(self, name, temperature, precipitation, vegetation_density, terrain_type, area, color):
         self.cursor.execute('''
-            INSERT INTO terrain (name, temperature, precipitation, vegetation_density, terrain_type, area, color)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        ''', (name, temperature, precipitation, vegetation_density, terrain_type, area, color))
+            INSERT INTO terrain (name, temperature, precipitation, vegetation_density, terrain_type, area)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (name, temperature, precipitation, vegetation_density, terrain_type, area))
         conn.commit()
         return self.cursor.lastrowid
 
@@ -481,6 +481,7 @@ terrain_data = load_json_data("terrain.json")
 
 biomes:list[int]=[]
 for terrain_name, terrain_attributes in terrain_data.items():
+    print(terrain_attributes)
     terrain_id = terrain_manager.create_new_terrain(**terrain_attributes)
     biomes.append(terrain_id)
 # Creating Animals in the Forest

@@ -303,7 +303,7 @@ class Island():
         with open("terrain-archetypes.json", "r") as archetype_file:
             archetype_data = json.load(archetype_file)
         archetype_names = list(archetype_data.keys())
-
+        index = 1
         for i in range(1, num_features + 1):
             feature_mask = labeled_mask == i
             color_block = np.zeros_like(original_image)
@@ -335,7 +335,8 @@ class Island():
                     land_size = int(np.sum(feature_mask))
                     if land_size >= 200:
                         # Create a unique key for each biome entry
-                        key = f"{archetype_color}_{j}"
+                        key = str(index)  # Convert the index to a string
+                        index += 1  # Increment the index
                         if key in terrain_data:
                             # If the key already exists, update the existing dictionary
                             terrain_data[key].update({
@@ -364,7 +365,7 @@ class Island():
             json.dump(terrain_data, json_file, indent=4)
 
 
-    
+        
     def split_color_block_by_color(self, image_path="color_blocks/color_block_1.png"):
         with Image.open(image_path) as im:
             color_block_image = np.array(im)
@@ -394,8 +395,14 @@ class Island():
                 if np.sum(feature_mask) < 200 or (j==1 and i==0):  # Check if the area is less than 200 pixels
                     continue
                 split_color_area = np.zeros((color_block_image.shape[0], color_block_image.shape[1], 4), dtype=np.uint8)
-                split_color_area[feature_mask, :3] = color_block_image[feature_mask]
-                split_color_area[feature_mask, 3] = 255
+                split_color_area[feature_mask, :3] = color_block_image[feature_mask, :3]  # Extract color data
+                split_color_area[feature_mask, 3] = 255  # Set alpha to fully opaque
+
+                # Find the color of the opaque segment
+                opaque_segment_color = np.mean(split_color_area[feature_mask, :3], axis=0).astype(int)
+
+                # Printing the color
+                print(f"Color: {opaque_segment_color}")
 
                 # Create a mask for border pixels
                 border_mask = np.zeros(color_block_image.shape[:2], dtype=bool)
@@ -415,6 +422,7 @@ class Island():
                 split_area_image.save(block_path)
                 j += 1  # Increment j for the next fragment
             i += 1  # Increment i for the next color
+
 
 
     @staticmethod

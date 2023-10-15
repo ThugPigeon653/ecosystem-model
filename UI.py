@@ -6,11 +6,14 @@ from PyQt5.QtCore import Qt, QPoint
 from PyQt5.QtWidgets import QDesktopWidget 
 from db_connection import Connection
 import world_visualizer
+import ecosystem
+import multiprocessing
 
 class CustomWidget(QWidget):
     __conn=None 
     def __init__(self, background_path, overlay_folder):
         super().__init__()
+        self.__conn = Connection.get_connection()
         self.background_image = QPixmap(background_path)
         self.overlay_images = []
         self.overlay_positions = []
@@ -46,7 +49,6 @@ class CustomWidget(QWidget):
             # Calculate the click position in terms of the terrain
             terrain_size = self.original_background_size  # Use the original background size
             click_pos = event.pos()
-            
             # Identify the specific region of the terrain that was clicked
             for i, overlay_position in enumerate(self.overlay_positions):
                 overlay_image = self.overlay_images[i]
@@ -54,19 +56,21 @@ class CustomWidget(QWidget):
                     pixel_color = overlay_image.toImage().pixel(click_pos)
                     alpha = (pixel_color >> 24) & 0xFF
                     if alpha != 0:
-                        self.__conn = Connection.get_connection()
                         cursor = self.__conn.cursor()
-                        cursor.execute('SELECT name, area FROM terrain WHERE id = ?', (i,))
-                        name, area = cursor.fetchone()
-                        print(f"Name: {name}, Alpha: {alpha}, Size: {area}")
-   
+                        cursor.execute('SELECT * FROM terrain')
+                        info = cursor.fetchone()
+                        print(f"{info}")
+
 if __name__ == "__main__":
-    island=world_visualizer.Island()
+    #island=world_visualizer.Island()
     #world_visualizer.MapUtils().draw_ocean()
+    #background_thread=multiprocessing.Process(target=ecosystem.initialize)
+    #background_thread.start()
+    ecosystem.initialize()
     app = QApplication(sys.argv)
     #background_path = "color_blocks/color_block_1.png"
     background_path ="img/ocean/0.png"
     overlay_folder = "split_color_blocks"
     window = CustomWidget(background_path, overlay_folder)
-    window.showFullScreen()
-    sys.exit(app.exec_())
+    #window.showFullScreen()
+    #sys.exit(app.exec_())

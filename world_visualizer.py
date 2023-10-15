@@ -1,7 +1,6 @@
-import sqlite3
 import json
 import matplotlib.pyplot as plt
-from db_connection import Connection
+import db_connection 
 import turtle
 import math
 import random
@@ -298,12 +297,6 @@ class Island():
         non_bw_mask = np.any((original_image != 0) & (original_image != 255), axis=-1)
         labeled_mask, num_features = ndimage.label(non_bw_mask)
         os.makedirs("color_blocks", exist_ok=True)
-        terrain_data = {}  # Initialize the terrain data dictionary
-        color_map = {}  # Initialize the color-to-biome mapping
-        with open("terrain-archetypes.json", "r") as archetype_file:
-            archetype_data = json.load(archetype_file)
-        archetype_names = list(archetype_data.keys())
-        index = 1
         for i in range(1, num_features + 1):
             feature_mask = labeled_mask == i
             color_block = np.zeros_like(original_image)
@@ -311,58 +304,13 @@ class Island():
             color_block_image = Image.fromarray(color_block)  # Convert to Image
             block_path = os.path.join("color_blocks", f"color_block_{i}.png")
             color_block_image.save(block_path)
-
-            # Construct terrain data for this color block
             color_block_array = np.array(color_block_image)  # Convert to NumPy array
             unique_colors = np.unique(color_block_array.reshape(-1, color_block_array.shape[2]), axis=0)
             for color in unique_colors:
                 color_mask = np.all(color_block_array == color, axis=-1)
                 labeled_mask, num_features = ndimage.label(color_mask)
-
-                # Assign a biome name based on the color
-                color_key = f"{color[0]},{color[1]},{color[2]}"
-                if color_key in color_map:
-                    # If the color is in the mapping, use the corresponding biome name
-                    archetype_color = color_map[color_key]
-                else:
-                    # If the color isn't in the mapping, assign a biome name
-                    archetype_color = archetype_names[len(terrain_data) % len(archetype_names)]
-                    color_map[color_key] = archetype_color
-
-                # Construct the terrain entry for each unique region
                 for j in range(1, num_features + 1):
                     feature_mask = labeled_mask == j
-                    land_size = int(np.sum(feature_mask))
-                    if land_size >= 200:
-                        # Create a unique key for each biome entry
-                        key = str(index)  # Convert the index to a string
-                        index += 1  # Increment the index
-                        if key in terrain_data:
-                            # If the key already exists, update the existing dictionary
-                            terrain_data[key].update({
-                                "name": archetype_data[archetype_color]["name"],
-                                "temperature": int(archetype_data[archetype_color]["temperature"]),
-                                "precipitation": int(archetype_data[archetype_color]["precipitation"]),
-                                "vegetation_density": int(archetype_data[archetype_color]["vegetation_density"]),
-                                "terrain_type": archetype_color,
-                                "area": land_size,
-                                "color": color[:3].tolist()
-                            })
-                        else:
-                            # If the key doesn't exist, create a new dictionary entry
-                            terrain_data[key] = {
-                                "name": archetype_data[archetype_color]["name"],
-                                "temperature": int(archetype_data[archetype_color]["temperature"]),
-                                "precipitation": int(archetype_data[archetype_color]["precipitation"]),
-                                "vegetation_density": int(archetype_data[archetype_color]["vegetation_density"]),
-                                "terrain_type": archetype_color,
-                                "area": land_size,
-                                "color": color[:3].tolist()
-                            }
-
-        # Save the terrain data to a JSON file
-        with open('terrain.json', 'w') as json_file:
-            json.dump(terrain_data, json_file, indent=4)
 
 
         
@@ -371,8 +319,9 @@ class Island():
             color_block_image = np.array(im)
         unique_colors = np.unique(color_block_image.reshape(-1, color_block_image.shape[2]), axis=0)
         split_blocks_dir = "split_color_blocks"
-
-        # Ensure the folder exists, and remove existing files
+        with open("terrain-archetypes.json", "r") as archetype_file:
+            archetype_data = json.load(archetype_file)
+        archetype_names = list(archetype_data.keys())
         os.makedirs(split_blocks_dir, exist_ok=True)
         for file in os.listdir(split_blocks_dir):
             file_path = os.path.join(split_blocks_dir, file)
@@ -385,6 +334,7 @@ class Island():
             archetype_data = json.load(archetype_file) 
         archetype_names = list(archetype_data.keys())
         i = 0  # Counter for i
+        terrain_data = {}  # Initialize the terrain data dictionary
         for color in unique_colors:
             color_mask = np.all(color_block_image == color, axis=-1)
             labeled_mask, num_features = ndimage.label(color_mask)
@@ -392,21 +342,30 @@ class Island():
             j = 0  # Counter for j
             for j in range(1, num_features + 1):
                 feature_mask = labeled_mask == j
-                if np.sum(feature_mask) < 200 or (j==1 and i==0):  # Check if the area is less than 200 pixels
+                land_size=np.sum(feature_mask)
+                if  land_size< 200 or (j==1 and i==0):  
                     continue
                 split_color_area = np.zeros((color_block_image.shape[0], color_block_image.shape[1], 4), dtype=np.uint8)
                 split_color_area[feature_mask, :3] = color_block_image[feature_mask, :3]  # Extract color data
                 split_color_area[feature_mask, 3] = 255  # Set alpha to fully opaque
-
-                # Find the color of the opaque segment
-                opaque_segment_color = np.mean(split_color_area[feature_mask, :3], axis=0).astype(int)
-                #TODO: Move logic from method above for terrain.json. Use this colour for __map_color and the method below, to ensure unique/consistent terrain. 
-                #      Check how ui.py prints the region currently being clicked ... make sure that the id of each json entry (index) is being assigned in 
-                #      a compatible way to how it is being read (see print statement in ui.py)
-                # Printing the color
-                print(f"Color: {opaque_segment_color}")
-
-                # Create a mask for border pixels
+                archetype_color = np.mean(split_color_area[feature_mask, :3], axis=0).astype(int)
+                color_str = self.color_to_string(color)
+                print(f"Color: {archetype_color}")
+                if color_str in self.__color_map:
+                    archetype_name = self.__color_map[color_str]
+                else:
+                    archetype_names = list(archetype_data.keys())
+                    archetype_name = random.choice(archetype_names)
+                    self.__color_map[color_str] = archetype_name
+                terrain_data[j] = {
+                    "name": archetype_data[self.__color_map[color_str]]["name"],
+                    "temperature": int(archetype_data[self.__color_map[color_str]]["temperature"]),
+                    "precipitation": int(archetype_data[self.__color_map[color_str]]["precipitation"]),
+                    "vegetation_density": int(archetype_data[self.__color_map[color_str]]["vegetation_density"]),
+                    "terrain_type": self.__color_map[color_str],
+                    "area": int(land_size),  # Convert land_size to integer
+                    "color": color[:3].tolist()
+                }
                 border_mask = np.zeros(color_block_image.shape[:2], dtype=bool)
                 for x in range(1, color_block_image.shape[0] - 1):
                     for y in range(1, color_block_image.shape[1] - 1):
@@ -414,17 +373,15 @@ class Island():
                             for dx, dy in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
                                 if not feature_mask[x + dx, y + dy]:
                                     border_mask[x, y] = True
-
-                # Apply the border mask to the fragment and darken it slightly
                 border_pixels = split_color_area[border_mask]
                 split_color_area[border_mask, :3] = (border_pixels[:, :3] * 0.8).astype(np.uint8)
-
                 split_area_image = Image.fromarray(split_color_area)
                 block_path = os.path.join(split_blocks_dir, f"split_block_{i}_area_{j}.png")
                 split_area_image.save(block_path)
                 j += 1  # Increment j for the next fragment
             i += 1  # Increment i for the next color
-
+        with open('terrain.json', 'w') as json_file:
+            json.dump(terrain_data, json_file, indent=4)
 
 
     @staticmethod
@@ -518,27 +475,25 @@ class AnimalData():
             for animal_name, animal_attributes in animal_data.items():
                 animal_names.append(animal_name)
 
-            conn = Connection.get_connection()
             
-            cursor = conn.cursor()
-            cursor.execute('SELECT id FROM Terrain')
-            results = cursor.fetchall()
+            db_connection.connection.execute('SELECT id FROM Terrain')
+            results = db_connection.connection.fetchall()
             for result in results:
                 result=result[0]
                 print(result)
                 if result:
                     for animal in animal_data:
-                        cursor.execute('SELECT COUNT(*) FROM animals WHERE terrain_id = ? AND name = ?',(str(result), animal))
-                        inner_result=cursor.fetchone()[0]
+                        db_connection.connection.execute('SELECT COUNT(*) FROM animals WHERE terrain_id = ? AND name = ?',(str(result), animal))
+                        inner_result=db_connection.connection.fetchone()[0]
                         print(f"There are {inner_result} {animal}")
                 else:
                     print("Query returned no results.")
             
-        except sqlite3.Error as e:
+        except Exception as e:
             print("SQLite error:", e)
         except OSError as e:
             print(e)
 
         finally:
-            conn.close()
+            db_connection.connection.close()
             print("Database connection closed.")

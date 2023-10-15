@@ -1,20 +1,18 @@
 #TODO: 
 # - calculate odds of pregnancy, and birth. As it stands, all interactions with a posssible birth do result in birth
 # - implement mutation 
-import sqlite3
 import json
 import random
 import os
-from db_connection import Connection
+import db_connection 
 
-if os.path.exists('animal_database.db'):
-    os.remove('animal_database.db')
-conn = Connection.get_connection()
+
+
 
 class Terrain:
     def __init__(self):
-        self.cursor = conn.cursor()
-        self.cursor.execute('''
+        self.db_connection = db_connection
+        self.db_connection.connection.execute('''
             CREATE TABLE terrain (
                 id INTEGER PRIMARY KEY,
                 name TEXT NOT NULL,
@@ -26,19 +24,19 @@ class Terrain:
                 color TEXT
             )
         ''')
-        conn.commit()
+        self.db_connection.connection.commit()
 
     def create_new_terrain(self, name, temperature, precipitation, vegetation_density, terrain_type, area, color):
-        self.cursor.execute('''
+        db_connection.connection.execute('''
             INSERT INTO terrain (name, temperature, precipitation, vegetation_density, terrain_type, area)
             VALUES (?, ?, ?, ?, ?, ?)
         ''', (name, temperature, precipitation, vegetation_density, terrain_type, area))
-        conn.commit()
-        return self.cursor.lastrowid
+        db_connection.connection.commit()
+        return db_connection.connection.lastrowid
 
     def get_terrain_attributes(self, terrain_id):
-        self.cursor.execute('SELECT * FROM terrain WHERE id = ?', (terrain_id,))
-        terrain_data = self.cursor.fetchone()
+        db_connection.connection.execute('SELECT * FROM terrain WHERE id = ?', (terrain_id,))
+        terrain_data = db_connection.connection.fetchone()
         if terrain_data:
             id, name, temperature, precipitation, vegetation_density, terrain_type, area = terrain_data
 
@@ -59,7 +57,7 @@ class Animals:
     __this_year:int=0
 
     def __init__(self):
-        self.cursor = conn.cursor()
+        self.cursor = db_connection.connection.cursor()
         self.cursor.execute('''
             CREATE TABLE animals (
                 id INTEGER PRIMARY KEY,
@@ -88,7 +86,7 @@ class Animals:
                 is_male BOOL CHECK(is_male=True or is_male=False)
             )
         ''')
-        conn.commit()
+        db_connection.connection.commit()
 
     @property
     def this_year(self):
@@ -110,9 +108,9 @@ class Animals:
         ''', (name, num_legs, eye_size, mouth_size, weight, energy_capacity, endurance, num_teeth, avg_old_age,
               old_age, breeding_lifecycle, eye_injury, leg_injury, mouth_injury, general_injury, json.dumps(prey_relationships), terrain_id, birth_rate, litter_size, born, ear_size, ear_injury, is_male))
 
-        conn.commit()
+        db_connection.connection.commit()
         print("\033[92mcreated "+name+" ("+str(self.cursor.lastrowid)+")\033[0m")
-        return self.cursor.lastrowid
+        return db_connection.connection.lastrowid
 
     def get_animal_attributes(self, animal_id):
         self.cursor.execute('SELECT * FROM animals WHERE id = ?', (animal_id,))
@@ -475,45 +473,47 @@ def load_json_data(path):
         data=json.load(json_data)
         return data
 
-# Creating a Terrain
-terrain_manager = Terrain()
-terrain_data = load_json_data("terrain.json")
+def initialize():
+    # Creating a Terrain
 
-biomes:list[int]=[]
-for terrain_name, terrain_attributes in terrain_data.items():
-    print(terrain_attributes)
-    terrain_id = terrain_manager.create_new_terrain(**terrain_attributes)
-    biomes.append(terrain_id)
-# Creating Animals in the Forest
-animal_manager = Animals()
-animal_data=load_json_data("animals.json")
-animals=["Deer", "Wolf", "Bear", "Lion", "Rabbit", "Fox"]
-for animal in animals:
-    
-    
-    data=animal_data[animal]
-    
+    terrain_manager = Terrain()
+    terrain_data = load_json_data("terrain.json")
+
+    biomes:list[int]=[]
+    for terrain_name, terrain_attributes in terrain_data.items():
+        print(terrain_attributes)
+        terrain_id = terrain_manager.create_new_terrain(**terrain_attributes)
+        biomes.append(terrain_id)
+    # Creating Animals in the Forest
+    animal_manager = Animals()
+    animal_data=load_json_data("animals.json")
+    animals=["Deer", "Wolf", "Bear", "Lion", "Rabbit", "Fox"]
+    for animal in animals:
+        
+        
+        data=animal_data[animal]
+        
+        i=0
+        while i<50:
+            terrain_id=biomes[random.randint(0,len(biomes)-1)]
+            data["terrain_id"]=terrain_id
+            animal_manager.create_new_animal(**data)
+            i+=1
+
+    # Retrieving Animal Attributes
     i=0
-    while i<50:
-        terrain_id=biomes[random.randint(0,len(biomes)-1)]
-        data["terrain_id"]=terrain_id
-        animal_manager.create_new_animal(**data)
-        i+=1
+    try:
+        while i<1000:
+            animal_manager.this_year=i
+            for animal_id in animal_manager.get_feeding_order():
+                encounters_for_animal=animal_manager.get_encounters_in_day(animal_id[0])
+                for encounter in encounters_for_animal:
+                    interaction=animal_manager.execute_interaction(animal_id[0], encounter[0])
+                    if(interaction!=None):
+                        print(str(i)+" "+interaction)
+            print(animal_manager.get_all_animals())
+            i+=1
 
-# Retrieving Animal Attributes
-i=0
-try:
-    while i<1000:
-        animal_manager.this_year=i
-        for animal_id in animal_manager.get_feeding_order():
-            encounters_for_animal=animal_manager.get_encounters_in_day(animal_id[0])
-            for encounter in encounters_for_animal:
-                interaction=animal_manager.execute_interaction(animal_id[0], encounter[0])
-                if(interaction!=None):
-                    print(str(i)+" "+interaction)
-        print(animal_manager.get_all_animals())
-        i+=1
+    except Exception as e:
+        print(e)
 
-finally:
-    conn.close()
-    print("Database connection closed.")

@@ -1,7 +1,8 @@
 import logging
 
 class MyLogger:
-    def __init__(self, log_file):
+    def __init__(self, log_file:str):
+        log_file="logs/"+log_file
         self.logger = logging.getLogger('my_logger')
         self.logger.setLevel(logging.DEBUG)
         file_handler = logging.FileHandler(log_file)
@@ -10,6 +11,12 @@ class MyLogger:
         self.logger.addHandler(file_handler)
 
     def log(self, message, level=logging.INFO):
+        return
+        try:
+            output=str(message)
+        except Exception as e:
+            level=logging.ERROR
+            message=f"Unable to parse object of type {type(message)} to str"
         if level == logging.DEBUG:
             self.logger.debug(message)
         elif level == logging.INFO:
@@ -20,5 +27,3 @@ class MyLogger:
             self.logger.error(message)
         elif level == logging.CRITICAL:
             self.logger.critical(message)
-
-

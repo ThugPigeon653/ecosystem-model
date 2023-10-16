@@ -1,18 +1,71 @@
 #TODO: 
-# - calculate odds of pregnancy, and birth. As it stands, all interactions with a posssible birth do result in birth
 # - implement mutation 
+# - vegetation reinforcement and supply
+# - before calling create_child...(), must check if pregnancy with mother id exists... also, has this logic been done?
+
 import json
 import random
 import os
-import db_connection 
+from db_connection import Connection
+import logger as log
+from logger import logging 
 
+logger=log.MyLogger('ecosystem.txt')
 
+if os.path.exists('animal_database.db'):
+    os.remove('animal_database.db')
+conn = Connection.get_connection()
 
+class Pregnancy:
+    def __init__(self):
+        self.cursor = conn.cursor()
+        self.cursor.execute('''
+            CREATE TABLE pregnancy (
+                mother_id INTEGER NOT NULL,
+                father_id INTEGER NOT NULL,
+                expiry INTEGER NOT NULL,
+                PRIMARY KEY(mother_id)
+            )
+        ''')
+        conn.commit()
 
+    def insert_pregnancy(self, mother_id:int, father_id:int, today):
+        self.cursor.execute('SELECT weight, birth_rate FROM animals WHERE id = ?', (mother_id,))
+        weight, birth_rate=self.cursor.fetchone()
+        expiry=int(((0.8*weight)+today)/(birth_rate))
+        self.cursor.execute('''
+            INSERT INTO pregnancy (mother_id, father_id, expiry)
+            VALUES (?, ?, ?)
+        ''', (mother_id, father_id, expiry))
+        conn.commit()
+        return self.cursor.lastrowid
+    
+    def is_able_to_conceive(self, animal_id:int, today:int):
+        self.cursor.execute('SELECT breeding_lifecycle, old_age, born, is_male FROM Animals WHERE id = ?', (animal_id,))
+        breeding_lifecycle, old_age, born, is_male=self.cursor.fetchone()
+        can_breed:bool=False
+        if(((breeding_lifecycle*old_age)+born)<=today):
+            if(is_male):
+                can_breed=True
+            else:
+                self.cursor.execute('SELECT expiry FROM pregnancy WHERE mother_id = ?', (animal_id,))
+                exp=self.cursor.fetchone()
+                if(exp!= None):
+                    expiry:int=exp[0]
+                else:
+                    expiry=None
+                if(expiry!=None):
+                    if(expiry<today):
+                        self.cursor.execute('DELETE FROM pregnancy WHERE mother_id = ?',(animal_id,))
+                        can_breed=True
+                else:
+                    can_breed=True
+        return can_breed
+    
 class Terrain:
     def __init__(self):
-        self.db_connection = db_connection
-        self.db_connection.connection.execute('''
+        self.cursor = conn.cursor()
+        self.cursor.execute('''
             CREATE TABLE terrain (
                 id INTEGER PRIMARY KEY,
                 name TEXT NOT NULL,
@@ -24,19 +77,19 @@ class Terrain:
                 color TEXT
             )
         ''')
-        self.db_connection.connection.commit()
+        conn.commit()
 
     def create_new_terrain(self, name, temperature, precipitation, vegetation_density, terrain_type, area, color):
-        db_connection.connection.execute('''
+        self.cursor.execute('''
             INSERT INTO terrain (name, temperature, precipitation, vegetation_density, terrain_type, area)
             VALUES (?, ?, ?, ?, ?, ?)
         ''', (name, temperature, precipitation, vegetation_density, terrain_type, area))
-        db_connection.connection.commit()
-        return db_connection.connection.lastrowid
+        conn.commit()
+        return self.cursor.lastrowid
 
     def get_terrain_attributes(self, terrain_id):
-        db_connection.connection.execute('SELECT * FROM terrain WHERE id = ?', (terrain_id,))
-        terrain_data = db_connection.connection.fetchone()
+        self.cursor.execute('SELECT * FROM terrain WHERE id = ?', (terrain_id,))
+        terrain_data = self.cursor.fetchone()
         if terrain_data:
             id, name, temperature, precipitation, vegetation_density, terrain_type, area = terrain_data
 
@@ -54,10 +107,11 @@ class Terrain:
 
 class Animals:
 
-    __this_year:int=0
+    __today:int=0
+    __pregnancy_manager:Pregnancy
 
     def __init__(self):
-        self.cursor = db_connection.connection.cursor()
+        self.cursor = conn.cursor()
         self.cursor.execute('''
             CREATE TABLE animals (
                 id INTEGER PRIMARY KEY,
@@ -86,15 +140,23 @@ class Animals:
                 is_male BOOL CHECK(is_male=True or is_male=False)
             )
         ''')
-        db_connection.connection.commit()
+        conn.commit()
 
     @property
-    def this_year(self):
-        return self.__this_year
+    def today(self):
+        return self.__today
     
-    @this_year.setter
-    def this_year(self, year):
-        self.__this_year=year
+    @today.setter
+    def today(self, year):
+        self.__today=year
+
+    @property
+    def pregnancy_manager(self):
+        return self.__pregnancy_manager
+
+    @pregnancy_manager.setter
+    def pregnancy_manager(self, pregnancy:Pregnancy):
+        self.__pregnancy_manager=pregnancy
 
     def create_new_animal(self, name:str, num_legs:int, eye_size:float, mouth_size:float, weight:float, energy_capacity:float, endurance:float,
                           num_teeth:int, avg_old_age:float, old_age:float, breeding_lifecycle:float, eye_injury:int, leg_injury:int, mouth_injury:int, general_injury:int, prey_relationships:list[str],
@@ -108,9 +170,9 @@ class Animals:
         ''', (name, num_legs, eye_size, mouth_size, weight, energy_capacity, endurance, num_teeth, avg_old_age,
               old_age, breeding_lifecycle, eye_injury, leg_injury, mouth_injury, general_injury, json.dumps(prey_relationships), terrain_id, birth_rate, litter_size, born, ear_size, ear_injury, is_male))
 
-        db_connection.connection.commit()
-        print("\033[92mcreated "+name+" ("+str(self.cursor.lastrowid)+")\033[0m")
-        return db_connection.connection.lastrowid
+        conn.commit()
+        logger.log("Created "+name+" ("+str(self.cursor.lastrowid)+")\033[0m", logging.INFO)
+        return self.cursor.lastrowid
 
     def get_animal_attributes(self, animal_id):
         self.cursor.execute('SELECT * FROM animals WHERE id = ?', (animal_id,))
@@ -156,57 +218,167 @@ class Animals:
     
     @staticmethod
     def average(parent1_attr, parent2_attr):
-        total = float(parent1_attr) + float(parent2_attr)
-        total = total / 2
-        if total % 1 == 0.5:
-            if random.randint(0, 1) == 1:
-                total = total + 0.5
+        try:
+            total:float = float(parent1_attr) + float(parent2_attr)
+            total = total / 2.00
+            if(type(parent1_attr)==float):
+                return total
             else:
-                total = total - 0.5
-        return total
+                return int(total)
+        except:
+            return None
     
-    def create_child_animal(self, parent1_id, parent2_id):
+    def create_child_animal(self, parent1_id:int, parent2_id:int, is_parent1_male:bool):
         parent1_attributes = self.get_animal_attributes(parent1_id)
         parent2_attributes = self.get_animal_attributes(parent2_id)
-        is_male=random.choice([True, False])
-        weight=Animals.average(parent1_attributes['weight'] , parent2_attributes['weight'])
-        weight_offset=(random.uniform(0.001, 0.300)*weight)
-        if(is_male):
-            weight+=weight_offset
+        if(is_parent1_male):
+            p1=parent2_id
+            p2=parent1_id
         else:
-            weight-=weight_offset 
+            p1=parent1_id
+            p2=parent2_id
+        litter_size=parent1_attributes['litter_size']
+        self.__pregnancy_manager.insert_pregnancy(p1, p2, self.__today)
         if parent1_attributes and parent2_attributes:
-            child_attributes = {
-                'name': parent1_attributes['name'],
-                'num_legs': Animals.average(parent1_attributes['num_legs'], parent2_attributes['num_legs']),
-                'eye_size': Animals.average(parent1_attributes['eye_size'] , parent2_attributes['eye_size']),
-                'mouth_size': Animals.average(parent1_attributes['mouth_size'] , parent2_attributes['mouth_size']),
-                'weight': weight,
-                'energy_capacity': Animals.average(parent1_attributes['energy_capacity'] , parent2_attributes['energy_capacity']),
-                'endurance': Animals.average(parent1_attributes['endurance'] , parent2_attributes['endurance']),
-                'num_teeth': int(Animals.average(parent1_attributes['num_teeth'] , parent2_attributes['num_teeth'])),
-                'avg_old_age': Animals.average(parent1_attributes['avg_old_age'] , parent2_attributes['avg_old_age']),
-                'old_age': Animals.average(parent1_attributes['old_age'] , parent2_attributes['old_age']),
-                'breeding_lifecycle': Animals.average(parent1_attributes['breeding_lifecycle'] , parent2_attributes['breeding_lifecycle']),
-                'eye_injury': 0, 
-                'leg_injury':0,
-                'mouth_injury':0,
-                'general_injury':0,
-                'prey_relationships': self.combine_prey_relationships(parent1_attributes['prey_relationships'], parent2_attributes['prey_relationships']),
-                'terrain_id': parent1_attributes['terrain_id'],
-                'birth_rate': Animals.average(parent1_attributes['birth_rate'] , parent1_attributes['birth_rate']),
-                'litter_size': Animals.average(parent1_attributes['litter_size'] , parent2_attributes['litter_size']),
-                'born':self.this_year,
-                'ear_size':Animals.average(parent1_attributes['ear_size'],parent2_attributes['ear_size']),
-                'ear_injury':0,
-                'is_male':is_male
-            }
+            while litter_size>0:
+                is_male=random.choice([True, False])
+                weight=Animals.average(parent1_attributes['weight'] , parent2_attributes['weight'])
+                weight_offset=(random.uniform(0.001, 0.300)*weight)
+                if(is_male):
+                    weight+=weight_offset
+                else:
+                    weight-=weight_offset 
+                    child_attributes = {
+                        'name': parent1_attributes['name'],
+                        'num_legs': Animals.average(parent1_attributes['num_legs'], parent2_attributes['num_legs']),
+                        'eye_size': Animals.average(parent1_attributes['eye_size'] , parent2_attributes['eye_size']),
+                        'mouth_size': Animals.average(parent1_attributes['mouth_size'] , parent2_attributes['mouth_size']),
+                        'weight': weight,
+                        'energy_capacity': Animals.average(parent1_attributes['energy_capacity'] , parent2_attributes['energy_capacity']),
+                        'endurance': Animals.average(parent1_attributes['endurance'] , parent2_attributes['endurance']),
+                        'num_teeth': int(Animals.average(parent1_attributes['num_teeth'] , parent2_attributes['num_teeth'])),
+                        'avg_old_age': Animals.average(parent1_attributes['avg_old_age'] , parent2_attributes['avg_old_age']),
+                        'old_age': Animals.average(parent1_attributes['old_age'] , parent2_attributes['old_age']),
+                        'breeding_lifecycle': Animals.average(parent1_attributes['breeding_lifecycle'] , parent2_attributes['breeding_lifecycle']),
+                        'eye_injury': 0, 
+                        'leg_injury':0,
+                        'mouth_injury':0,
+                        'general_injury':0,
+                        'prey_relationships': self.combine_prey_relationships(parent1_attributes['prey_relationships'], parent2_attributes['prey_relationships']),
+                        'terrain_id': parent1_attributes['terrain_id'],
+                        'birth_rate': Animals.average(parent1_attributes['birth_rate'] , parent1_attributes['birth_rate']),
+                        'litter_size': Animals.average(parent1_attributes['litter_size'] , parent2_attributes['litter_size']),
+                        'born':self.today,
+                        'ear_size':Animals.average(parent1_attributes['ear_size'],parent2_attributes['ear_size']),
+                        'ear_injury':0,
+                        'is_male':is_male
+                    }
+                    leg_mutation = eye_mutation = teeth_mutation = 0
+                    mouth_mutation = weight_mutation = energy_mutation = endurance_mutation = ear_mutation = 1
+                    if(random.randint(0,2000)==0):
+                        if(random.randint(0,1000)!=0):
+                            if(random.choice([True, False])):
+                                leg_mutation=-1
+                            else:
+                                leg_mutation=1
+                        else:
+                            if(random.choice([True, False])):
+                                leg_mutation=-2
+                            else:
+                                leg_mutation=2
+                    if(random.randint(0,3000)==0):
+                        if(random.randint(0,1000)!=0):
+                            if(random.choice([True, False])):
+                                eye_mutation=-1
+                            else:
+                                eye_mutation=1
+                        else:
+                            if(random.choice([True, False])):
+                                eye_mutation=-2
+                            else:
+                                eye_mutation=2
+                    if(random.randint(0,300)==0):
+                        if(random.randint(0,200)!=0):
+                            if(random.choice([True, False])):
+                                mouth_mutation=0.9
+                            else:
+                                mouth_mutation=1.1
+                        else:
+                            delta:float=random.uniform(0.00, 1.00)
+                            if(random.choice([True, False])):
+                                mouth_mutation=1+delta
+                            else:
+                                mouth_mutation=1-delta  
+                    if(random.randint(0,400)==0):
+                        if(random.randint(0,400)!=0):
+                            if(random.choice([True, False])):
+                                weight_mutation=0.9
+                            else:
+                                weight_mutation=1.1
+                        else:
+                            delta:float=random.uniform(0.00, 0.41)
+                            if(random.choice([True, False])):
+                                weight_mutation=1+delta
+                            else:
+                                weight_mutation=1-delta
+                    if(random.randint(0,550)==0):
+                        if(random.randint(0,750)!=0):
+                            if(random.choice([True, False])):
+                                energy_mutation=0.98
+                            else:
+                                energy_mutation=1.02
+                        else:
+                            delta:float=random.uniform(0.00, 0.1)
+                            if(random.choice([True, False])):
+                                energy_mutation=1+delta
+                            else:
+                                energy_mutation=1-delta  
+                    if(random.randint(0,550)==0):
+                        if(random.randint(0,750)!=0):
+                            if(random.choice([True, False])):
+                                endurance_mutation=0.98
+                            else:
+                                endurance_mutation=1.02
+                        else:
+                            delta:float=random.uniform(0.00, 0.1)
+                            if(random.choice([True, False])):
+                                endurance_mutation=1+delta
+                            else:
+                                endurance_mutation=1-delta
+                    if(random.randint(0,600)==0):
+                        if(random.randint(0,1000)!=0):
+                            if(random.choice([True, False])):
+                                teeth_mutation=-1
+                            else:
+                                teeth_mutation=1
+                        else:
+                            if(random.choice([True, False])):
+                                teeth_mutation=-2
+                            else:
+                                teeth_mutation=2
+                    if(random.randint(0,950)==0):
+                        if(random.randint(0,1050)!=0):
+                            if(random.choice([True, False])):
+                                ear_mutation=0.98
+                            else:
+                                ear_mutation=1.02
+                        else:
+                            delta:float=random.uniform(0.00, 0.1)
+                            if(random.choice([True, False])):
+                                ear_mutation=1+delta
+                            else:
+                                ear_mutation=1-delta
+                    child_attributes['num_legs']+=leg_mutation
+                    child_attributes['eye_size']+=eye_mutation
+                    child_attributes['mouth_size']*=mouth_mutation
+                    child_attributes['weight']*=weight_mutation
+                    child_attributes['energy_capacity']*=energy_mutation
+                    child_attributes['endurance']*=endurance_mutation
+                    child_attributes['num_teeth']+=teeth_mutation
+                    child_attributes['ear_size']*=ear_mutation
 
-            self.create_new_animal(**child_attributes)
-
-            return f"\033[92mChild animal created with ID {self.cursor.lastrowid}\033[0m"
-        else:
-            return "Failed to create child animal: Parent animals not found"
+                    self.create_new_animal(**child_attributes)
+                litter_size-=1
     
     def get_all_animals(self):
         self.cursor.execute('SELECT * FROM animals')
@@ -255,9 +427,9 @@ class Animals:
         animal_data = self.cursor.fetchone()
         old_age, born = animal_data
         mid_age=old_age/2
-        current_age=self.this_year-born
+        current_age=self.today-born
         # if theyre younger...
-        if(self.this_year<=(old_age/2)+born):
+        if(self.today<=(old_age/2)+born):
             modifier:float=current_age/mid_age
         else:
             modifier:float=(old_age-current_age)/mid_age
@@ -420,6 +592,7 @@ class Animals:
                     victim=prey_id
                 else:
                     victim=predator_id
+                self.cursor.execute('DELETE FROM pregnancy WHERE mother_id = ?', (victim,))
                 self.cursor.execute('DELETE FROM Animals WHERE id = ?', (victim,))
                 return_value=("\n\033[91m"+str(victim)+ " has been killed\033[0m")
         return return_value
@@ -433,11 +606,19 @@ class Animals:
             self.cursor.execute('SELECT name, is_male FROM Animals WHERE id = ?', (prey_id,))
             prey_name, prey_is_male=self.cursor.fetchone()
             status:str=f"No interaction eventuated between {predator_name} and {prey_name}. "
-            print(predator_name + " found a "+prey_name)
-            if(predator_name==predator_name and predator_is_male!=prey_is_male and (random.randint(0,1)==1)):
-                self.create_child_animal(predator_id, prey_id)
-                status=None
-            else:
+            logger.log(predator_name + " found a "+prey_name,logging.INFO)
+            conception:bool=False
+            protected_by_sexual_interest:bool=False
+            if(predator_name==prey_name and predator_is_male!=prey_is_male and (random.randint(0,1)==1)):
+                prey_can_conceive:bool=self.__pregnancy_manager.is_able_to_conceive(prey_id, self.__today)
+                predator_can_conceive:bool=self.__pregnancy_manager.is_able_to_conceive(predator_id, self.__today)
+                if(predator_can_conceive):
+                    protected_by_sexual_interest=True
+                    if(prey_can_conceive):
+                        conception=True
+            if(conception):
+                self.create_child_animal(predator_id, prey_id, predator_is_male)
+            elif(protected_by_sexual_interest!=True):
                 chase_decision=(self.get_does_chase_animal(predator_id, prey_id),self.get_does_chase_animal(prey_id, predator_id))
                 if(chase_decision==(True,True)):
                     status=f"A fight ensued between {predator_name} and {prey_name}"
@@ -466,54 +647,51 @@ class Animals:
         self.cursor.execute('SELECT id FROM Animals ORDER BY RANDOM()')
         return self.cursor.fetchall()
 
-## EXAMPLE USAGE ##
-
 def load_json_data(path):
     with open(path, "r") as json_data:
         data=json.load(json_data)
         return data
 
 def initialize():
-    # Creating a Terrain
-
     terrain_manager = Terrain()
     terrain_data = load_json_data("terrain.json")
 
     biomes:list[int]=[]
     for terrain_name, terrain_attributes in terrain_data.items():
-        print(terrain_attributes)
+        logger.log(terrain_attributes, logging.info)
         terrain_id = terrain_manager.create_new_terrain(**terrain_attributes)
         biomes.append(terrain_id)
-    # Creating Animals in the Forest
     animal_manager = Animals()
+    animal_manager.pregnancy_manager=Pregnancy()
     animal_data=load_json_data("animals.json")
     animals=["Deer", "Wolf", "Bear", "Lion", "Rabbit", "Fox"]
     for animal in animals:
-        
-        
         data=animal_data[animal]
-        
         i=0
-        while i<50:
+        while i<5000:
             terrain_id=biomes[random.randint(0,len(biomes)-1)]
             data["terrain_id"]=terrain_id
             animal_manager.create_new_animal(**data)
             i+=1
-
-    # Retrieving Animal Attributes
     i=0
+    with open('config/shared_runtime_config.json', 'r') as file:
+        config = json.load(file)
     try:
         while i<1000:
-            animal_manager.this_year=i
+            config["today"]=1
+            with open('config/shared_runtime_config.json', 'w') as file:
+                json.dump(config, file, indent=4)
+            if(i%100==0):
+                print(i)
+            animal_manager.today=i
             for animal_id in animal_manager.get_feeding_order():
                 encounters_for_animal=animal_manager.get_encounters_in_day(animal_id[0])
                 for encounter in encounters_for_animal:
                     interaction=animal_manager.execute_interaction(animal_id[0], encounter[0])
                     if(interaction!=None):
-                        print(str(i)+" "+interaction)
-            print(animal_manager.get_all_animals())
+                        logger.log(str(i)+" "+interaction, logging.INFO)
+            logger.log(animal_manager.get_all_animals(), logging.INFO)
             i+=1
-
-    except Exception as e:
-        print(e)
-
+    finally:
+        conn.close()
+        logger.log("Database connection closed.", logging.INFO)

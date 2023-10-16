@@ -14,6 +14,7 @@ from scipy.spatial import Voronoi
 from scipy import ndimage
 import cv2
 import os
+import sqlite3
 
 # Instncing this class results in all images being saved to their respective folders. Beyond init, it doesnt do anything else (yet)
 class Island():
@@ -315,6 +316,7 @@ class Island():
 
         
     def split_color_block_by_color(self, image_path="color_blocks/color_block_1.png"):
+        index=1
         with Image.open(image_path) as im:
             color_block_image = np.array(im)
         unique_colors = np.unique(color_block_image.reshape(-1, color_block_image.shape[2]), axis=0)
@@ -350,14 +352,14 @@ class Island():
                 split_color_area[feature_mask, 3] = 255  # Set alpha to fully opaque
                 archetype_color = np.mean(split_color_area[feature_mask, :3], axis=0).astype(int)
                 color_str = self.color_to_string(color)
-                print(f"Color: {archetype_color}")
                 if color_str in self.__color_map:
                     archetype_name = self.__color_map[color_str]
                 else:
                     archetype_names = list(archetype_data.keys())
                     archetype_name = random.choice(archetype_names)
                     self.__color_map[color_str] = archetype_name
-                terrain_data[j] = {
+                print("terrain: "+str(archetype_data[self.__color_map[color_str]]["name"]) + "  colour" + str(archetype_color))
+                terrain_data[index] = {
                     "name": archetype_data[self.__color_map[color_str]]["name"],
                     "temperature": int(archetype_data[self.__color_map[color_str]]["temperature"]),
                     "precipitation": int(archetype_data[self.__color_map[color_str]]["precipitation"]),
@@ -366,6 +368,7 @@ class Island():
                     "area": int(land_size),  # Convert land_size to integer
                     "color": color[:3].tolist()
                 }
+                index+=1
                 border_mask = np.zeros(color_block_image.shape[:2], dtype=bool)
                 for x in range(1, color_block_image.shape[0] - 1):
                     for y in range(1, color_block_image.shape[1] - 1):
@@ -391,34 +394,20 @@ class Island():
 
     # Worth doing? some kind of post-process is needed. The image is generated in low res.
     def scale_images_in_folder(self, folder_path):
-        # List all files in the specified folder
         files = os.listdir(folder_path)
-        
         for file in files:
-            # Check if the file is a PNG image
             if file.lower().endswith(".png"):
-                # Get the full file path
                 file_path = os.path.join(folder_path, file)
-                
                 with Image.open(file_path) as img:
-                    # Replace the scaling values with your desired width and height
                     target_width = 1920
                     target_height = 1080
-                    
-                    # Calculate the scaling factor for the new dimensions
                     current_width, current_height = img.size
                     scaling_factor_w = target_width / current_width
                     scaling_factor_h = target_height / current_height
-                    
-                    # Choose the smaller scaling factor to maintain aspect ratio
                     scaling_factor = min(scaling_factor_w, scaling_factor_h)
                     new_width = int(current_width * scaling_factor)
                     new_height = int(current_height * scaling_factor)
-                    
-                    # Resize the image with antialias resampling
                     img = img.resize((new_width, new_height), Image.LANCZOS)
-                    
-                    # Save the scaled image back to the same location
                     img.save(file_path)
 
 class MapUtils():
@@ -459,6 +448,9 @@ class MapUtils():
         result_image.save("img/ocean/"+str(0)+'.png')
 
 class AnimalData():
+    __conn=None
+    def __init__(self) -> None:
+        self.__conn=sqlite3.connect('animal_database.db')
     @staticmethod
     def load_json_data(path):
         try:
@@ -468,14 +460,33 @@ class AnimalData():
             data=None
         return data
 
-    def get_animals_by_region(self):
+    def get_animals_by_region(self, region:int):
+        summary:str=""
         try:
             animal_data=self.load_json_data('animals.json')
             animal_names = []  
             for animal_name, animal_attributes in animal_data.items():
                 animal_names.append(animal_name)
+            if len(animal_data)>0:
+                for animal in animal_data:
+                    cursor=self.__conn.cursor()
+                    cursor.execute('SELECT COUNT(*) FROM animals WHERE terrain_id = ? AND name = ?',(region, animal))
+                    inner_result=cursor.fetchone()[0]
+                    summary+=(f"{inner_result} {animal}\n")
+            else:
+                summary=("Query returned no results.")
+        except Exception as e:
+            summary=("SQLite error:", e)
+        return summary 
 
-            
+
+
+    def get_animals_all_regions(self):
+        try:
+            animal_data=self.load_json_data('animals.json')
+            animal_names = []  
+            for animal_name, animal_attributes in animal_data.items():
+                animal_names.append(animal_name)
             db_connection.connection.execute('SELECT id FROM Terrain')
             results = db_connection.connection.fetchall()
             for result in results:
@@ -483,17 +494,14 @@ class AnimalData():
                 print(result)
                 if result:
                     for animal in animal_data:
-                        db_connection.connection.execute('SELECT COUNT(*) FROM animals WHERE terrain_id = ? AND name = ?',(str(result), animal))
+                        cursor=sqlite3.connect('animal_database.db').cursor(0)
+                        cursor.execute('SELECT COUNT(*) FROM animals WHERE terrain_id = ? AND name = ?',(str(result), animal))
                         inner_result=db_connection.connection.fetchone()[0]
                         print(f"There are {inner_result} {animal}")
                 else:
                     print("Query returned no results.")
-            
         except Exception as e:
             print("SQLite error:", e)
-        except OSError as e:
-            print(e)
-
         finally:
             db_connection.connection.close()
             print("Database connection closed.")

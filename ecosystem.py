@@ -228,6 +228,9 @@ class Animals:
         except:
             return None
     
+    def delete_animal(self, animal_id:int):
+        self.cursor.execute('DELETE FROM Animals WHERE id = ?', (animal_id,))
+
     def create_child_animal(self, parent1_id:int, parent2_id:int, is_parent1_male:bool):
         parent1_attributes = self.get_animal_attributes(parent1_id)
         parent2_attributes = self.get_animal_attributes(parent2_id)
@@ -592,7 +595,7 @@ class Animals:
                     victim=prey_id
                 else:
                     victim=predator_id
-                self.cursor.execute('DELETE FROM pregnancy WHERE mother_id = ?', (victim,))
+                self.delete_animal(victim)
                 self.cursor.execute('DELETE FROM Animals WHERE id = ?', (victim,))
                 return_value=("\n\033[91m"+str(victim)+ " has been killed\033[0m")
         return return_value
@@ -668,7 +671,7 @@ def initialize():
     for animal in animals:
         data=animal_data[animal]
         i=0
-        while i<5000:
+        while i<200:
             terrain_id=biomes[random.randint(0,len(biomes)-1)]
             data["terrain_id"]=terrain_id
             animal_manager.create_new_animal(**data)
@@ -677,21 +680,34 @@ def initialize():
     with open('config/shared_runtime_config.json', 'r') as file:
         config = json.load(file)
     try:
-        while i<1000:
+        while i<10000:
             config["today"]=1
             with open('config/shared_runtime_config.json', 'w') as file:
                 json.dump(config, file, indent=4)
             if(i%100==0):
-                print(i)
+                cursor = conn.cursor()
+                cursor.execute('SELECT COUNT(*) FROM animals')
+                pop = cursor.fetchone()[0]
+                print(pop)
             animal_manager.today=i
             for animal_id in animal_manager.get_feeding_order():
-                encounters_for_animal=animal_manager.get_encounters_in_day(animal_id[0])
-                for encounter in encounters_for_animal:
-                    interaction=animal_manager.execute_interaction(animal_id[0], encounter[0])
-                    if(interaction!=None):
-                        logger.log(str(i)+" "+interaction, logging.INFO)
-            logger.log(animal_manager.get_all_animals(), logging.INFO)
+                cursor=conn.cursor()
+                cursor.execute('SELECT old_age, born FROM animals WHERE id = ?', (animal_id,))
+                datum=cursor.fetchone()
+                born, old_age=datum
+                if(born+old_age<=i):
+                    animal_manager.delete_animal(animal_id)
+                else:
+                    encounters_for_animal=animal_manager.get_encounters_in_day(animal_id[0])
+                    for encounter in encounters_for_animal:
+                        interaction=animal_manager.execute_interaction(animal_id[0], encounter[0])
+                        if(interaction!=None):
+                            logger.log(str(i)+" "+interaction, logging.INFO)
+            #logger.log(animal_manager.get_all_animals(), logging.INFO)
             i+=1
     finally:
         conn.close()
         logger.log("Database connection closed.", logging.INFO)
+
+##TODO: REMOVE THIS
+initialize()

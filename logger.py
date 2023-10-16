@@ -5,10 +5,10 @@ class MyLogger:
         log_file="logs/"+log_file
         self.logger = logging.getLogger('my_logger')
         self.logger.setLevel(logging.DEBUG)
-        file_handler = logging.FileHandler(log_file)
-        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-        file_handler.setFormatter(formatter)
-        self.logger.addHandler(file_handler)
+        #file_handler = logging.FileHandler(log_file)
+        #formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        #file_handler.setFormatter(formatter)
+        #self.logger.addHandler(file_handler)
 
     def log(self, message, level=logging.INFO):
         return

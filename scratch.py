@@ -1,24 +1,17 @@
-import logging
+import subprocess
+import os
+import re
 
-class MyLogger:
-    def __init__(self, log_file):
-        self.logger = logging.getLogger('my_logger')
-        self.logger.setLevel(logging.DEBUG)
-        file_handler = logging.FileHandler(log_file)
-        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-        file_handler.setFormatter(formatter)
-        self.logger.addHandler(file_handler)
+with open("trace.txt", "r") as input_file:
+    content = input_file.read()
+    spaces = True
+    while spaces:
+        cache_content = content
+        content = content.replace("  ", " ")
+        if content == cache_content:
+            spaces = False
 
-    def log(self, message, level=logging.INFO):
-        if level == logging.DEBUG:
-            self.logger.debug(message)
-        elif level == logging.INFO:
-            self.logger.info(message)
-        elif level == logging.WARNING:
-            self.logger.warning(message)
-        elif level == logging.ERROR:
-            self.logger.error(message)
-        elif level == logging.CRITICAL:
-            self.logger.critical(message)
+with open("cleaned_trace.txt", "w") as output_file:
+    output_file.write(content)
 
-
+print("Data cleaned and saved as cleaned_trace.txt")

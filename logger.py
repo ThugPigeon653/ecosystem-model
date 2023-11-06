@@ -11,7 +11,7 @@ class MyLogger:
         #self.logger.addHandler(file_handler)
 
     def log(self, message, level=logging.INFO):
-        return
+        return # disabled logger when it is not needed - saves generating log files for no reason
         try:
             output=str(message)
         except Exception as e:

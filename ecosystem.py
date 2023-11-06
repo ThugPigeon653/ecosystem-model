@@ -1,7 +1,7 @@
 #TODO: 
-# - implement mutation 
 # - vegetation reinforcement and supply
-# - before calling create_child...(), must check if pregnancy with mother id exists... also, has this logic been done?
+# - add current energy (as well as the existing max energy) to animals. 
+# - reduce energy every day - increase for feeding - dont attack if not hungry
 
 import json
 import random
@@ -681,29 +681,25 @@ def initialize():
         config = json.load(file)
     try:
         while i<10000:
-            config["today"]=1
+            config["today"]=i
             with open('config/shared_runtime_config.json', 'w') as file:
                 json.dump(config, file, indent=4)
-            if(i%100==0):
-                cursor = conn.cursor()
-                cursor.execute('SELECT COUNT(*) FROM animals')
-                pop = cursor.fetchone()[0]
-                print(pop)
             animal_manager.today=i
             for animal_id in animal_manager.get_feeding_order():
                 cursor=conn.cursor()
-                cursor.execute('SELECT old_age, born FROM animals WHERE id = ?', (animal_id,))
-                datum=cursor.fetchone()
-                born, old_age=datum
-                if(born+old_age<=i):
-                    animal_manager.delete_animal(animal_id)
-                else:
-                    encounters_for_animal=animal_manager.get_encounters_in_day(animal_id[0])
-                    for encounter in encounters_for_animal:
-                        interaction=animal_manager.execute_interaction(animal_id[0], encounter[0])
-                        if(interaction!=None):
-                            logger.log(str(i)+" "+interaction, logging.INFO)
-            #logger.log(animal_manager.get_all_animals(), logging.INFO)
+                cursor.execute('SELECT born, old_age FROM animals WHERE id = ?', animal_id)
+                vals=cursor.fetchone()
+                if(vals!=None):
+                    born, old_age=vals
+                    if(born+old_age<=i):
+                        cursor.execute('DELETE FROM animals WHERE id = ?', animal_id)
+                    else:
+                        encounters_for_animal=animal_manager.get_encounters_in_day(animal_id[0])
+                        for encounter in encounters_for_animal:
+                            interaction=animal_manager.execute_interaction(animal_id[0], encounter[0])
+                            if(interaction!=None):
+                                logger.log(str(i)+" "+interaction, logging.INFO)
+            logger.log(animal_manager.get_all_animals(), logging.INFO)
             i+=1
     finally:
         conn.close()

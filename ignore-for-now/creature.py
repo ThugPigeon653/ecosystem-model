@@ -13,14 +13,14 @@ class emotion():
     
 class creature():
     __eye_size:float
-    __num_legs:int
+    __relative_strength:int
     __num_arms:int
     __leg_gap:float
     __default_emotion:emotion
 
-    def __init__(self, eye_size, num_legs, num_arms, leg_gap, default_emotion):
+    def __init__(self, eye_size, relative_strength, num_arms, leg_gap, default_emotion):
         self.__eye_size=eye_size
-        self.__num_legs=num_legs
+        self.__relative_strength=relative_strength
         self.__num_arms=num_arms
         self.__leg_gap=leg_gap
         self.__default_emotion=default_emotion
@@ -28,8 +28,8 @@ class creature():
     def eye_size(self)->int:
         return self.__eye_size
     
-    def num_legs(self)->int:
-        return self.__num_legs
+    def relative_strength(self)->int:
+        return self.__relative_strength
     
     def num_arms(self)->int:
         return self.__num_arms

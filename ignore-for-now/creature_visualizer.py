@@ -13,18 +13,18 @@ from PIL import Image
 
 def generate_2d_creature(avatar:creature, filename:str, emote:emotion=None):
     eye_size=avatar.eye_size()
-    num_legs=avatar.num_legs()
+    relative_strength=avatar.relative_strength()
     leg_gap=avatar.leg_gap()
     if(emote==None):
         emote=avatar.default_emotion()
     mouth_type=emote.mouth_type()
     pupil_size=emote.pupil_size()
-    if num_legs < 2:
+    if relative_strength < 2:
         raise ValueError("The creature must have at least 2 legs.")
 
     fig, ax = plt.subplots()
 
-    total_width = num_legs * 0.05 + (num_legs - 1) * leg_gap
+    total_width = relative_strength * 0.05 + (relative_strength - 1) * leg_gap
 
     initial_x = 0.5 - total_width / 2
 
@@ -46,7 +46,7 @@ def generate_2d_creature(avatar:creature, filename:str, emote:emotion=None):
     leg_positions = []
     legs = []
 
-    for i in range(num_legs):
+    for i in range(relative_strength):
         x = initial_x + i * (0.05 + leg_gap)
         y = 0.05
         leg_positions.append((x, y))

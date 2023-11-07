@@ -2,6 +2,7 @@
 # - vegetation reinforcement and supply
 # - add current energy (as well as the existing max energy) to animals. 
 # - reduce energy every day - increase for feeding - dont attack if not hungry
+# - work in the effects of hunger
 
 import json
 import random
@@ -106,7 +107,9 @@ class Terrain:
             return None
 
 class Animals:
-
+    __migration:float=1
+    __savagery:int=10
+    __birth_tuner:int=100 # percentage_value
     __today:int=0
     __pregnancy_manager:Pregnancy
 
@@ -116,7 +119,7 @@ class Animals:
             CREATE TABLE animals (
                 id INTEGER PRIMARY KEY,
                 name TEXT NOT NULL,
-                num_legs INTEGER,
+                relative_strength INTEGER,
                 eye_size REAL,
                 mouth_size REAL,
                 weight REAL,
@@ -137,6 +140,9 @@ class Animals:
                 born INTEGER,
                 ear_size REAL,
                 ear_injury INTEGER,
+                survival_days INTEGER CHECK(survival_days!=0),
+                food_intake INTEGER,
+                energy REAL,
                 is_male BOOL CHECK(is_male=True or is_male=False)
             )
         ''')
@@ -145,30 +151,50 @@ class Animals:
     @property
     def today(self):
         return self.__today
-    
     @today.setter
     def today(self, year):
         self.__today=year
 
     @property
+    def birth_tuner(self)->int:
+        return self.__birth_tuner
+    @birth_tuner.setter
+    def birth_tuner(self, setting:int)->None:
+        self.__birth_tuner=setting
+
+    @property
+    def migration(self)->float:
+        return self.__migration
+    @migration.setter
+    def migration(self, setting:float)->None:
+        self.__migration=setting
+
+    @property
+    def savagery(self)->int:
+        return self.__savagery
+    @savagery.setter
+    def savagery(self, setting:int)->None:
+        self.__savagery=setting
+
+    @property
     def pregnancy_manager(self):
         return self.__pregnancy_manager
-
     @pregnancy_manager.setter
     def pregnancy_manager(self, pregnancy:Pregnancy):
         self.__pregnancy_manager=pregnancy
 
-    def create_new_animal(self, name:str, num_legs:int, eye_size:float, mouth_size:float, weight:float, energy_capacity:float, endurance:float,
+    def create_new_animal(self, name:str, relative_strength:int, eye_size:float, mouth_size:float, weight:float, energy_capacity:float, endurance:float,
                           num_teeth:int, avg_old_age:float, old_age:float, breeding_lifecycle:float, eye_injury:int, leg_injury:int, mouth_injury:int, general_injury:int, prey_relationships:list[str],
-                          terrain_id, birth_rate, litter_size, born, ear_size, ear_injury, is_male:bool=None):
+                          terrain_id, birth_rate, litter_size, born, ear_size, ear_injury, survival_days:int, food_intake:int, energy:float, is_male:bool=None):
         if(is_male==None):
             is_male=random.choice([True, False])
         self.cursor.execute('''
-            INSERT INTO animals (name, num_legs, eye_size, mouth_size, weight, energy_capacity, endurance,
-            num_teeth, avg_old_age, old_age, breeding_lifecycle, eye_injury, leg_injury, mouth_injury, general_injury, prey_relationships, terrain_id, birth_rate, litter_size, born, ear_size, ear_injury, is_male)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (name, num_legs, eye_size, mouth_size, weight, energy_capacity, endurance, num_teeth, avg_old_age,
-              old_age, breeding_lifecycle, eye_injury, leg_injury, mouth_injury, general_injury, json.dumps(prey_relationships), terrain_id, birth_rate, litter_size, born, ear_size, ear_injury, is_male))
+            INSERT INTO animals (name, relative_strength, eye_size, mouth_size, weight, energy_capacity, endurance,
+            num_teeth, avg_old_age, old_age, breeding_lifecycle, eye_injury, leg_injury, mouth_injury, general_injury, prey_relationships, terrain_id, birth_rate, litter_size, born, ear_size, ear_injury, survival_days, food_intake, energy, is_male)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (name, relative_strength, eye_size, mouth_size, weight, energy_capacity, endurance, num_teeth, avg_old_age,
+              old_age, breeding_lifecycle, eye_injury, leg_injury, mouth_injury, general_injury, json.dumps(prey_relationships), terrain_id, birth_rate, litter_size, born, ear_size, ear_injury, survival_days,
+               food_intake, energy, is_male))
 
         conn.commit()
         logger.log("Created "+name+" ("+str(self.cursor.lastrowid)+")\033[0m", logging.INFO)
@@ -178,14 +204,14 @@ class Animals:
         self.cursor.execute('SELECT * FROM animals WHERE id = ?', (animal_id,))
         animal_data = self.cursor.fetchone()
         if animal_data:
-            id, name, num_legs, eye_size, mouth_size, weight, energy_capacity, endurance, num_teeth, avg_old_age, old_age, breeding_lifecycle, eye_injury, leg_injury, mouth_injury, general_injury, prey_relationships_json, terrain_id, birth_rate, litter_size, born, ear_size, ear_injury, is_male = animal_data
+            id, name, relative_strength, eye_size, mouth_size, weight, energy_capacity, endurance, num_teeth, avg_old_age, old_age, breeding_lifecycle, eye_injury, leg_injury, mouth_injury, general_injury, prey_relationships_json, terrain_id, birth_rate, litter_size, born, ear_size, ear_injury, survival_days, food_intake, energy, is_male = animal_data
 
             prey_relationships = json.loads(prey_relationships_json) if prey_relationships_json else None
 
             return {
                 'id': id,
                 'name': name,
-                'num_legs': num_legs,
+                'relative_strength': relative_strength,
                 'eye_size': eye_size,
                 'mouth_size': mouth_size,
                 'weight': weight,
@@ -207,7 +233,11 @@ class Animals:
                 'litter_size': litter_size,
                 'born':born,
                 'ear_size':ear_size,
-                'ear_injury':ear_injury
+                'ear_injury':ear_injury,
+                'survival_days':survival_days,
+                'food_intake':food_intake,
+                'energy':energy, 
+                'is_male':is_male
             }
         else:
             return None
@@ -253,7 +283,7 @@ class Animals:
                     weight-=weight_offset 
                     child_attributes = {
                         'name': parent1_attributes['name'],
-                        'num_legs': Animals.average(parent1_attributes['num_legs'], parent2_attributes['num_legs']),
+                        'relative_strength': Animals.average(parent1_attributes['relative_strength'], parent2_attributes['relative_strength']),
                         'eye_size': Animals.average(parent1_attributes['eye_size'] , parent2_attributes['eye_size']),
                         'mouth_size': Animals.average(parent1_attributes['mouth_size'] , parent2_attributes['mouth_size']),
                         'weight': weight,
@@ -274,6 +304,9 @@ class Animals:
                         'born':self.today,
                         'ear_size':Animals.average(parent1_attributes['ear_size'],parent2_attributes['ear_size']),
                         'ear_injury':0,
+                        'survival_days':Animals.average(parent1_attributes['survival_days'],parent1_attributes['survival_days']),
+                        'food_intake':Animals.average(parent1_attributes['survival_days'],parent1_attributes['survival_days']),
+                        'energy':100, 
                         'is_male':is_male
                     }
                     leg_mutation = eye_mutation = teeth_mutation = 0
@@ -371,7 +404,7 @@ class Animals:
                                 ear_mutation=1+delta
                             else:
                                 ear_mutation=1-delta
-                    child_attributes['num_legs']+=leg_mutation
+                    child_attributes['relative_strength']+=leg_mutation
                     child_attributes['eye_size']+=eye_mutation
                     child_attributes['mouth_size']*=mouth_mutation
                     child_attributes['weight']*=weight_mutation
@@ -379,7 +412,6 @@ class Animals:
                     child_attributes['endurance']*=endurance_mutation
                     child_attributes['num_teeth']+=teeth_mutation
                     child_attributes['ear_size']*=ear_mutation
-
                     self.create_new_animal(**child_attributes)
                 litter_size-=1
     
@@ -389,14 +421,14 @@ class Animals:
 
         animals_list = []
         for animal_data in all_animals:
-            id, name, num_legs, eye_size, mouth_size, weight, energy_capacity, endurance, num_teeth, avg_old_age, old_age, breeding_lifecycle, eye_injury, leg_injury, mouth_injury, general_injury, prey_relationships_json, terrain_id, birth_rate, litter_size, born, ear_size, ear_injury, is_male = animal_data
+            id, name, relative_strength, eye_size, mouth_size, weight, energy_capacity, endurance, num_teeth, avg_old_age, old_age, breeding_lifecycle, eye_injury, leg_injury, mouth_injury, general_injury, prey_relationships_json, terrain_id, birth_rate, litter_size, born, ear_size, ear_injury, survival_days, food_intake, energy, is_male = animal_data
 
             prey_relationships = json.loads(prey_relationships_json) if prey_relationships_json else None
 
             animal = {
                 'id': id,
                 'name': name,
-                'num_legs': num_legs,
+                'relative_strength': relative_strength,
                 'eye_size': eye_size,
                 'mouth_size': mouth_size,
                 'weight': weight,
@@ -537,15 +569,15 @@ class Animals:
         return will_chase
 
     def get_does_catch_animal(self, predator_id:int, prey_id:int)->bool:
-        self.cursor.execute('SELECT num_legs, weight, energy_capacity, endurance, leg_injury, general_injury, terrain_id FROM Animals WHERE id = ?', (predator_id,))
-        num_legs, weight, energy_capacity, endurance, leg_injury, general_injury, terrain_id=self.cursor.fetchone()
+        self.cursor.execute('SELECT relative_strength, weight, energy_capacity, endurance, leg_injury, general_injury, terrain_id FROM Animals WHERE id = ?', (predator_id,))
+        relative_strength, weight, energy_capacity, endurance, leg_injury, general_injury, terrain_id=self.cursor.fetchone()
         self.cursor.execute('SELECT vegetation_density FROM terrain WHERE id = ?', (terrain_id,))
         vegetation_density=self.cursor.fetchone()[0]
-        predator_score=((((num_legs**0.5)*energy_capacity)/(weight*((22-leg_injury-general_injury)/20)))*endurance)/(1+vegetation_density)
-        self.cursor.execute('SELECT num_legs, weight, energy_capacity, endurance, leg_injury, general_injury FROM Animals WHERE id = ?', (prey_id,))
-        num_legs, weight, energy_capacity, endurance, leg_injury, general_injury = self.cursor.fetchone()
+        predator_score=((((relative_strength**0.5)*energy_capacity)/(weight*((22-leg_injury-general_injury)/20)))*endurance)/(1+vegetation_density)
+        self.cursor.execute('SELECT relative_strength, weight, energy_capacity, endurance, leg_injury, general_injury FROM Animals WHERE id = ?', (prey_id,))
+        relative_strength, weight, energy_capacity, endurance, leg_injury, general_injury = self.cursor.fetchone()
         try:
-            prey_score=((((num_legs**0.5)*energy_capacity)/(weight*((22-leg_injury-general_injury)/20)))*endurance)/(1+vegetation_density)
+            prey_score=((((relative_strength**0.5)*energy_capacity)/(weight*((22-leg_injury-general_injury)/20)))*endurance)/(1+vegetation_density)
         except Exception as e:
             pass
         predator_score=random.uniform(predator_score/2.00, predator_score)
@@ -557,18 +589,28 @@ class Animals:
             catches_prey=False
         return catches_prey
 
+    def list_prey(self, animal_id:str)->list[str]:
+        self.cursor.execute('SELECT prey_relationships FROM Animals WHERE id = ?',(animal_id,))
+        ans=self.cursor.fetchone()
+        if ans!=None:
+            return ans[0].replace(" ", "").split(',')
+        else: 
+            return None
+
+    # some variables are accessed but not used here. They should be implemented fully
     def get_combat_outcome(self, predator_id:int, prey_id:int)->str:
         outcome:float=False
         return_value=None
         if(predator_id!=None and prey_id!=None):
             predator_age=self.get_age_modifier(predator_id)
             prey_age=self.get_age_modifier(prey_id)
-            self.cursor.execute('SELECT name, num_legs, mouth_size, weight, energy_capacity, endurance, num_teeth from Animals WHERE id = ?', (predator_id,))
-            predator_name, num_legs, mouth_size, weight, energy_capacity, endurance, num_teeth = self.cursor.fetchone()
-            predator_score:float = random.uniform(0.00, (num_legs**0.5)*mouth_size*(num_teeth**1.1)*(endurance**0.9)*(energy_capacity**0.9)*(weight**0.5))
-            self.cursor.execute('SELECT name, num_legs, mouth_size, weight, energy_capacity, endurance, num_teeth from Animals WHERE id = ?', (prey_id,))
-            prey_name, num_legs, mouth_size, weight, energy_capacity, endurance, num_teeth = self.cursor.fetchone()
-            prey_score:float = random.uniform(0.00, (num_legs**0.55)*(mouth_size**0.9)*(num_teeth**0.9)*(endurance**1.1)*energy_capacity*(weight**0.5))
+            self.cursor.execute('SELECT name, relative_strength, mouth_size, weight, energy_capacity, endurance, num_teeth from Animals WHERE id = ?', (predator_id,))
+            predator_name, relative_strength, mouth_size, weight, energy_capacity, endurance, num_teeth = self.cursor.fetchone()
+            p_weight=weight
+            predator_score:float = random.uniform(0.01, (relative_strength**0.5)*mouth_size*(num_teeth**1.1)*(endurance**0.9)*(energy_capacity**0.9)*(weight**0.5))
+            self.cursor.execute('SELECT name, relative_strength, mouth_size, weight, energy_capacity, endurance, num_teeth from Animals WHERE id = ?', (prey_id,))
+            prey_name, relative_strength, mouth_size, weight, energy_capacity, endurance, num_teeth = self.cursor.fetchone()
+            prey_score:float = random.uniform(0.01, (relative_strength**0.55)*(mouth_size**0.9)*(num_teeth**0.9)*(endurance**1.1)*energy_capacity*(weight**0.5))
             outcome = predator_score-prey_score
             final_result=(outcome/predator_score)
             if(abs(final_result)>0.1 and abs(final_result)<7):
@@ -586,19 +628,43 @@ class Animals:
                     injury=injury+final_result
                 else:
                     injury=10
+                injury=int(injury*((100-random.randint(0, self.savagery))/100))
                 column_name = injury_types[injury_roll] + "_injury"
                 query = 'UPDATE Animals SET {} = ? WHERE id = ?'.format(column_name)
                 self.cursor.execute(query, (injury, victim))
                 return_value=("\n\033[93m"+str(victim)+ " has been injured\033[0m("+str(final_result))
             elif(abs(outcome)>=0.7):
-                if(outcome>0):
-                    victim=prey_id
-                else:
-                    victim=predator_id
-                self.delete_animal(victim)
-                self.cursor.execute('DELETE FROM Animals WHERE id = ?', (victim,))
-                return_value=("\n\033[91m"+str(victim)+ " has been killed\033[0m")
+                if(random.randint(0,100)<=self.savagery):
+                    killed_mass=0
+                    if(outcome>0):
+                        victim=prey_id
+                        victor=predator_id
+                        if(weight<=self.get_animal_current_hunger_for_kg(victim)):
+                            self.delete_animal(victim)
+                            return_value  ="Killed"
+                            killed_mass=weight
+                    else:
+                        victim=predator_id
+                        victor=prey_id
+                        if(p_weight<=self.get_animal_current_hunger_for_kg(victim)):
+                            self.delete_animal(victim)
+                            return_value  ="Killed"
+                            killed_mass=p_weight
+                    if(killed_mass!=0):
+                        prey:list[str]=self.list_prey(victor)
+                        self.cursor.execute('SELECT name FROM Animals WHERE id=?',(victim,))
+                        if(self.cursor.fetchone() in prey):
+                            self.cursor.execute('SELECT survival_days, weight, food_intake, energy, prey_relationships FROM Animals WHERE id =?', (victor,))
+                            sd,w,fi,e=self.cursor.fetchone()
+                            daily_req=(fi/100)*w
+                            e=min(100,e+(killed_mass/daily_req)*(sd/100))
+                    return_value=("\n\033[91m"+str(victim)+ " has been killed\033[0m")
         return return_value
+
+    def get_animal_current_hunger_for_kg(self, animal_id:int)->float:
+        self.cursor.execute('SELECT survival_days, food_intake, energy, weight FROM Animals WHERE id = ?', (animal_id,))
+        sd, fi, en, w = self.cursor.fetchone()
+        return ((en)/(sd/100))*(w*fi)
 
     def execute_interaction(self, predator_id:int, prey_id:int):
         self.cursor.execute('SELECT name, is_male FROM Animals WHERE id = ?', (predator_id,))
@@ -612,7 +678,7 @@ class Animals:
             logger.log(predator_name + " found a "+prey_name,logging.INFO)
             conception:bool=False
             protected_by_sexual_interest:bool=False
-            if(predator_name==prey_name and predator_is_male!=prey_is_male and (random.randint(0,1)==1)):
+            if(predator_name==prey_name and predator_is_male!=prey_is_male and random.randint(0,100)<=self.birth_tuner):
                 prey_can_conceive:bool=self.__pregnancy_manager.is_able_to_conceive(prey_id, self.__today)
                 predator_can_conceive:bool=self.__pregnancy_manager.is_able_to_conceive(predator_id, self.__today)
                 if(predator_can_conceive):
@@ -650,6 +716,19 @@ class Animals:
         self.cursor.execute('SELECT id FROM Animals ORDER BY RANDOM()')
         return self.cursor.fetchall()
 
+    def get_energy_after_day_consumed(self, animal_id:int):
+        self.cursor.execute('SELECT energy, survival_days FROM Animals where id=?', (animal_id,))
+        energy, sd = self.cursor.fetchone()
+        energy-=100/sd
+        return energy
+
+    def count_animals_by_type(self, animal_type, terrain_id):
+        query = 'SELECT COUNT(*) FROM animals WHERE name = ? AND terrain_id = ?'
+        self.cursor.execute(query, (animal_type, terrain_id))
+        count = self.cursor.fetchone()[0]
+        return count
+
+
 def load_json_data(path):
     with open(path, "r") as json_data:
         data=json.load(json_data)
@@ -657,53 +736,101 @@ def load_json_data(path):
 
 def initialize():
     terrain_manager = Terrain()
-    terrain_data = load_json_data("terrain.json")
-
-    biomes:list[int]=[]
+    terrain_data = load_json_data("config/terrain.json")
+    biomes: list[int] = []
     for terrain_name, terrain_attributes in terrain_data.items():
         logger.log(terrain_attributes, logging.info)
         terrain_id = terrain_manager.create_new_terrain(**terrain_attributes)
         biomes.append(terrain_id)
+        with open('config/animals.json', 'r') as file:
+            animals_dat = json.load(file)
+            animals = list(animals_dat.keys())
+    animal_counts = {f"{animal}_{terrain_id}": 0 for animal in animals for terrain_id in biomes}
+    animal_counts_by_year = {}  
+
     animal_manager = Animals()
-    animal_manager.pregnancy_manager=Pregnancy()
-    animal_data=load_json_data("animals.json")
-    animals=["Deer", "Wolf", "Bear", "Lion", "Rabbit", "Fox"]
+    animal_manager.pregnancy_manager = Pregnancy()
+    animal_data = load_json_data("config/animals.json")
     for animal in animals:
-        data=animal_data[animal]
-        i=0
-        while i<200:
-            terrain_id=biomes[random.randint(0,len(biomes)-1)]
-            data["terrain_id"]=terrain_id
+        data = animal_data[animal]
+        i = 0
+        old_age=data["old_age"]
+        lim=100
+        if animal=="Crocodile" or animal=="Wolf":
+            lim=50
+        elif animal=="Rabbit" or animal=="Frog" or animal=="Deer" or animal=="Elephant":
+            lim=300
+        while i < lim:
+            terrain_id = biomes[random.randint(0, len(biomes) - 1)]
+            data["terrain_id"] = terrain_id
+            data["energy"] = 100
+            data["born"]=0-(random.randint(0,int(old_age)))
             animal_manager.create_new_animal(**data)
-            i+=1
-    i=0
+            i += 1
+
+    i = 0
     with open('config/shared_runtime_config.json', 'r') as file:
         config = json.load(file)
+        config["today"] = 0
+
     try:
-        while i<10000:
-            config["today"]=i
+        while i < 100:
+            startvation:int=0
+            gotkilled:int=0
+            fromage:int=0
+            animal_counts_by_year[i] = {}  # Create a dictionary for this year
+            for terrain_id in biomes:
+                animal_counts_by_year[i][terrain_id] = {}  # Create a dictionary for this terrain_id
+                for animal_type in animals:
+                    count = animal_manager.count_animals_by_type(animal_type, terrain_id)
+                    animal_counts_by_year[i][terrain_id][animal_type] = count
+            config["today"] = i
             with open('config/shared_runtime_config.json', 'w') as file:
                 json.dump(config, file, indent=4)
-            animal_manager.today=i
+            animal_manager.today = i
             for animal_id in animal_manager.get_feeding_order():
-                cursor=conn.cursor()
-                cursor.execute('SELECT born, old_age FROM animals WHERE id = ?', animal_id)
-                vals=cursor.fetchone()
-                if(vals!=None):
-                    born, old_age=vals
-                    if(born+old_age<=i):
-                        cursor.execute('DELETE FROM animals WHERE id = ?', animal_id)
+                cursor = conn.cursor()
+                cursor.execute('SELECT name, born, old_age FROM animals WHERE id = ?', animal_id)
+                vals = cursor.fetchone()
+                if vals is not None:
+                    name, born, old_age = vals
+                    energy = animal_manager.get_energy_after_day_consumed(animal_id[0])
+                    cursor.execute("UPDATE Animals SET energy=? WHERE id=?", (energy, animal_id[0]))
+                    if energy > 0:
+                        if born + old_age <= i:
+                            cursor.execute('DELETE FROM animals WHERE id = ?', animal_id)
+                            fromage+=1
+                        else:
+                            encounters_for_animal = animal_manager.get_encounters_in_day(animal_id[0])
+                            for encounter in encounters_for_animal:
+                                interaction = animal_manager.execute_interaction(animal_id[0], encounter[0])
+                                if interaction is not None:
+                                    if("illed" in interaction):
+                                        gotkilled+=1
+                                    logger.log(str(i) + " " + interaction, logging.INFO)
+                            if(random.randint(0,1000*int(len(encounters_for_animal)*animal_manager.migration))==0):
+                                new_terrain:int=biomes[random.randint(0,len(biomes)-1)]
+                                cursor.execute("UPDATE Animals SET terrain_id=? WHERE id=?", (new_terrain, animal_id[0]))
+                                try:
+                                    if("Grass" in animal_manager.list_prey(animal_id[0])):
+                                        cursor.execute("UPDATE Animals SET energy=? WHERE id=?", (100, animal_id[0]))
+                                except:
+                                    print("Failed to get prey for "+name)
                     else:
-                        encounters_for_animal=animal_manager.get_encounters_in_day(animal_id[0])
-                        for encounter in encounters_for_animal:
-                            interaction=animal_manager.execute_interaction(animal_id[0], encounter[0])
-                            if(interaction!=None):
-                                logger.log(str(i)+" "+interaction, logging.INFO)
+                        cursor.execute('DELETE FROM animals WHERE id = ?', animal_id)
+                        startvation+=1
             logger.log(animal_manager.get_all_animals(), logging.INFO)
-            i+=1
+            print(f"Year {i}   Eaten: {gotkilled}    OldAge: {fromage}    Starve: {startvation}")
+            i += 1
     finally:
+        print(f"Eaten: {gotkilled}    OldAge: {fromage}    Starve: {startvation}")
         conn.close()
         logger.log("Database connection closed.", logging.INFO)
+        with open('logs/animal_counts_by_year.json', 'w') as counts_file:
+            json.dump(animal_counts_by_year, counts_file, indent=4)
+        print("Simulation complete")
 
-##TODO: REMOVE THIS
-initialize()
+
+
+
+

@@ -321,7 +321,7 @@ class Island():
             color_block_image = np.array(im)
         unique_colors = np.unique(color_block_image.reshape(-1, color_block_image.shape[2]), axis=0)
         split_blocks_dir = "split_color_blocks"
-        with open("terrain-archetypes.json", "r") as archetype_file:
+        with open("config/terrain-archetypes.json", "r") as archetype_file:
             archetype_data = json.load(archetype_file)
         archetype_names = list(archetype_data.keys())
         os.makedirs(split_blocks_dir, exist_ok=True)
@@ -332,7 +332,7 @@ class Island():
                     os.unlink(file_path)
             except Exception as e:
                 print(f"Failed to delete {file_path}: {e}")
-        with open("terrain-archetypes.json", "r") as archetype_file:
+        with open("config/terrain-archetypes.json", "r") as archetype_file:
             archetype_data = json.load(archetype_file) 
         archetype_names = list(archetype_data.keys())
         i = 0  # Counter for i
@@ -358,7 +358,6 @@ class Island():
                     archetype_names = list(archetype_data.keys())
                     archetype_name = random.choice(archetype_names)
                     self.__color_map[color_str] = archetype_name
-                print("terrain: "+str(archetype_data[self.__color_map[color_str]]["name"]) + "  colour" + str(archetype_color))
                 terrain_data[index] = {
                     "name": archetype_data[self.__color_map[color_str]]["name"],
                     "temperature": int(archetype_data[self.__color_map[color_str]]["temperature"]),
@@ -383,7 +382,7 @@ class Island():
                 split_area_image.save(block_path)
                 j += 1  # Increment j for the next fragment
             i += 1  # Increment i for the next color
-        with open('terrain.json', 'w') as json_file:
+        with open('config/terrain.json', 'w') as json_file:
             json.dump(terrain_data, json_file, indent=4)
 
 
@@ -463,7 +462,7 @@ class AnimalData():
     def get_animals_by_region(self, region:int):
         summary:str=""
         try:
-            animal_data=self.load_json_data('animals.json')
+            animal_data=self.load_json_data('config/animals.json')
             animal_names = []  
             for animal_name, animal_attributes in animal_data.items():
                 animal_names.append(animal_name)
@@ -483,7 +482,7 @@ class AnimalData():
 
     def get_animals_all_regions(self):
         try:
-            animal_data=self.load_json_data('animals.json')
+            animal_data=self.load_json_data('config/animals.json')
             animal_names = []  
             for animal_name, animal_attributes in animal_data.items():
                 animal_names.append(animal_name)
@@ -491,7 +490,6 @@ class AnimalData():
             results = db_connection.connection.fetchall()
             for result in results:
                 result=result[0]
-                print(result)
                 if result:
                     for animal in animal_data:
                         cursor=sqlite3.connect('animal_database.db').cursor(0)

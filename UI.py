@@ -1,4 +1,4 @@
-import sys
+import sys  
 import os
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel
 from PyQt5.QtGui import QPixmap, QPainter
@@ -78,6 +78,12 @@ def background_thread():
     eco.initialize()
 
 if __name__ == "__main__":
+    # reset the shared config file
+    with open('config/shared_runtime_config.json', 'r') as file:
+        config = json.load(file)
+        config["today"]=0
+        with open('config/shared_runtime_config.json', 'w') as file:
+            json.dump(config, file, indent=4)
     #island=world_visualizer.Island()
     world_visualizer.MapUtils().draw_ocean()
     task=threading.Thread(target=background_thread)

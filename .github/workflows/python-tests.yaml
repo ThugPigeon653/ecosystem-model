@@ -26,17 +26,33 @@ jobs:
         run: pytest -s test/test_ecosystem.py
 
       - name: Create Pull Request
-        id: create_pr
-        uses: peter-evans/create-pull-request@v3
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          base: main
-          branch: ${{ github.ref }}
-          title: "Automated PR from ${{ github.ref }} to main"
-          body: "This PR was created automatically after successful tests."
-
-      - name: Merge Pull Request
-        if: steps.create_pr.outputs.pull-request-number
         run: |
-          gh pr merge ${{ steps.create_pr.outputs.pull-request-number }} --auto --delete-branch
-
+          TOKEN=$GITHUB_TOKEN
+          BASE=main
+          HEAD=${{ github.ref }}
+          TITLE="Automated PR from $HEAD to $BASE"
+          BODY="This PR was created automatically after successful tests."
+          RESPONSE=$(curl -X POST \
+            -H "Authorization: token $TOKEN" \
+            -d '{
+              "title": "'"$TITLE"'",
+              "base": "'"$BASE"'",
+              "head": "'"$HEAD"'",
+              "body": "'"$BODY"'"
+            }' \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/pulls")
+          PR_URL=$(echo $RESPONSE | jq -r .html_url)
+          echo "Created Pull Request: $PR_URL"
+        if: success()
+      - name: Merge Pull Request
+        run: |
+          TOKEN=$GITHUB_TOKEN
+          PR_NUMBER=$(curl -H "Authorization: token $TOKEN" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/pulls?head=$GITHUB_ACTOR:$GITHUB_REF" | jq -r .[0].number)
+          if [ -z "$PR_NUMBER" ]; then
+            echo "Pull Request not found."
+            exit 1
+          fi
+          curl -X PUT -H "Authorization: token $TOKEN" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/merge"
+        if: success()

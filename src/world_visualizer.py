@@ -16,7 +16,7 @@ import cv2
 import os
 import sqlite3
 
-# Instncing this class results in all images being saved to their respective folders. Beyond init, it doesnt do anything else (yet)
+# Instancing this class results in all images being saved to their respective folders. Beyond init, it doesnt do anything else (yet)
 class Island():
     __map_path:str=None
     __outline=None

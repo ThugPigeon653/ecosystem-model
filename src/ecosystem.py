@@ -774,7 +774,7 @@ def initialize():
         config["today"] = 0
 
     try:
-        while i < 100:
+        while i < 50:
             startvation:int=0
             gotkilled:int=0
             fromage:int=0

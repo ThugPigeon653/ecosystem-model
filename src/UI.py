@@ -27,15 +27,10 @@ class CustomWidget(QWidget):
                     self.overlay_images.append(overlay_image)
                     self.overlay_positions.append(QPoint(0, 0))
         screen = QDesktopWidget().screenGeometry()
-
-        # Keep the original background size
         self.original_background_size = self.background_image.size()
-        # Scale the background to the screen size
         self.background_image = self.background_image.scaled(screen.width(), screen.height(), Qt.KeepAspectRatio)
         self.setFixedSize(screen.width(), screen.height())
         self.setMouseTracking(True)
-
-        # Create a QLabel for displaying text
         self.text_label = QLabel(self)
         self.text_label.setGeometry(self.original_background_size.width(), 0, self.width() - self.original_background_size.width(), self.height())
         self.text_label.setAlignment(Qt.AlignCenter)
@@ -84,7 +79,7 @@ if __name__ == "__main__":
         config["today"]=0
         with open('config/shared_runtime_config.json', 'w') as file:
             json.dump(config, file, indent=4)
-    #island=world_visualizer.Island()
+    island=world_visualizer.Island()
     world_visualizer.MapUtils().draw_ocean()
     task=threading.Thread(target=background_thread)
     task.start()

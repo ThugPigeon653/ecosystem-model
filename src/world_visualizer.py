@@ -16,7 +16,6 @@ import cv2
 import os
 import sqlite3
 
-# Instancing this class results in all images being saved to their respective folders. Beyond init, it doesnt do anything else (yet)
 class Island():
     __map_path:str=None
     __outline=None
@@ -32,8 +31,8 @@ class Island():
         turtle.pencolor('green')
         turtle.fillcolor('forest green')
         turtle.begin_fill()
-        self.shoreline(-300,0,300,0,0.55) # call recursion
-        self.shoreline(300,0,-300,0,0.55) # call recursion
+        self.shoreline(-300,0,300,0,0.55) 
+        self.shoreline(300,0,-300,0,0.55) 
         turtle.end_fill()
         turtle.update()
         cv = turtle.getcanvas()

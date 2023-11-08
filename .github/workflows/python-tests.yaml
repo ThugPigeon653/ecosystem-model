@@ -16,7 +16,7 @@ jobs:
       - name: Setup py installation
         uses: actions/setup-python@v2
         with: 
-          python-version: 3.10.3
+          python-version: 3.x
 
       - name: Install dependancies
         run: pip install PyQt5 opencv-python numpy pillow scipy matplotlib

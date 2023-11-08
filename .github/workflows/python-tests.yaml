@@ -22,4 +22,4 @@ jobs:
         run: pip install PyQt5 opencv-python numpy pillow scipy matplotlib pytest
 
       - name: Run tests
-        run: pytest test/test_ecosystem.py
+        run: pytest -s test/test_ecosystem.py

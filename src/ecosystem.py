@@ -67,6 +67,7 @@ class Pregnancy:
 class Terrain:
     def __init__(self):
         self.cursor = conn.cursor()
+        self.cursor.execute('DROP TABLE IF EXISTS Terrain')
         self.cursor.execute('''
             CREATE TABLE terrain (
                 id INTEGER PRIMARY KEY,
@@ -81,7 +82,7 @@ class Terrain:
         ''')
         conn.commit()
 
-    def create_new_terrain(self, name, temperature, precipitation, vegetation_density, terrain_type, area, color):
+    def create_new_terrain(self, name:str, temperature:float, precipitation:float, vegetation_density:float, terrain_type:str, area:float, color:str):
         self.cursor.execute('''
             INSERT INTO terrain (name, temperature, precipitation, vegetation_density, terrain_type, area)
             VALUES (?, ?, ?, ?, ?, ?)
@@ -116,6 +117,7 @@ class Animals:
 
     def __init__(self):
         self.cursor = conn.cursor()
+        self.cursor.execute('DROP TABLE IF EXISTS animals')
         self.cursor.execute('''
             CREATE TABLE animals (
                 id INTEGER PRIMARY KEY,

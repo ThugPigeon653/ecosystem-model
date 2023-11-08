@@ -3,7 +3,8 @@ name: Python Tests
 on:
   push:
     branches:
-      - dev
+      - '*'
+      - '!main'
 
 jobs:
   test:
@@ -23,3 +24,19 @@ jobs:
 
       - name: Run tests
         run: pytest -s test/test_ecosystem.py
+
+      - name: Create Pull Request
+        id: create_pr
+        uses: peter-evans/create-pull-request@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          base: main
+          branch: ${{ github.ref }}
+          title: "Automated PR from ${{ github.ref }} to main"
+          body: "This PR was created automatically after successful tests."
+
+      - name: Merge Pull Request
+        if: steps.create_pr.outputs.pull-request-number
+        run: |
+          gh pr merge ${{ steps.create_pr.outputs.pull-request-number }} --auto --delete-branch
+

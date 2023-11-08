@@ -728,7 +728,7 @@ def load_json_data(path):
         try:
             data=json.load(json_data)
         except Exception as e:
-            print(f"*********{os.path.dirname(__file__)}*********")
+            print(f"*********Failed to load {path} from {os.path.dirname(__file__)}*********\n{e}")
         return data
 
 def initialize(test:bool=False):

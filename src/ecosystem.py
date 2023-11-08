@@ -7,7 +7,7 @@
 import json
 import random
 import os
-from db_connection import Connection
+from src.db_connection import Connection
 import logger as log
 from logger import logging 
 

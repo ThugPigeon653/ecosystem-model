@@ -1,0 +1,444 @@
+{
+    "1": {
+        "name": "Desert",
+        "temperature": 35,
+        "precipitation": 10,
+        "vegetation_density": 0,
+        "terrain_type": "Desert",
+        "area": 1381,
+        "color": [
+            0,
+            102,
+            0
+        ]
+    },
+    "2": {
+        "name": "Mountain",
+        "temperature": 15,
+        "precipitation": 80,
+        "vegetation_density": 0,
+        "terrain_type": "Mountain",
+        "area": 2107,
+        "color": [
+            7,
+            191,
+            45
+        ]
+    },
+    "3": {
+        "name": "Mountain",
+        "temperature": 15,
+        "precipitation": 80,
+        "vegetation_density": 0,
+        "terrain_type": "Mountain",
+        "area": 7986,
+        "color": [
+            7,
+            191,
+            45
+        ]
+    },
+    "4": {
+        "name": "Mountain",
+        "temperature": 15,
+        "precipitation": 80,
+        "vegetation_density": 0,
+        "terrain_type": "Mountain",
+        "area": 9848,
+        "color": [
+            7,
+            191,
+            45
+        ]
+    },
+    "5": {
+        "name": "Mountain",
+        "temperature": 15,
+        "precipitation": 80,
+        "vegetation_density": 0,
+        "terrain_type": "Mountain",
+        "area": 4213,
+        "color": [
+            7,
+            191,
+            45
+        ]
+    },
+    "6": {
+        "name": "Mountain",
+        "temperature": 15,
+        "precipitation": 80,
+        "vegetation_density": 0,
+        "terrain_type": "Mountain",
+        "area": 14368,
+        "color": [
+            7,
+            191,
+            45
+        ]
+    },
+    "7": {
+        "name": "Mountain",
+        "temperature": 15,
+        "precipitation": 80,
+        "vegetation_density": 0,
+        "terrain_type": "Mountain",
+        "area": 3562,
+        "color": [
+            7,
+            191,
+            45
+        ]
+    },
+    "8": {
+        "name": "Mountain",
+        "temperature": 15,
+        "precipitation": 80,
+        "vegetation_density": 0,
+        "terrain_type": "Mountain",
+        "area": 5669,
+        "color": [
+            7,
+            191,
+            45
+        ]
+    },
+    "9": {
+        "name": "Grassland",
+        "temperature": 20,
+        "precipitation": 60,
+        "vegetation_density": 0,
+        "terrain_type": "Grassland",
+        "area": 24051,
+        "color": [
+            21,
+            160,
+            105
+        ]
+    },
+    "10": {
+        "name": "Grassland",
+        "temperature": 20,
+        "precipitation": 60,
+        "vegetation_density": 0,
+        "terrain_type": "Grassland",
+        "area": 15304,
+        "color": [
+            21,
+            160,
+            105
+        ]
+    },
+    "11": {
+        "name": "Grassland",
+        "temperature": 20,
+        "precipitation": 60,
+        "vegetation_density": 0,
+        "terrain_type": "Grassland",
+        "area": 20457,
+        "color": [
+            21,
+            160,
+            105
+        ]
+    },
+    "12": {
+        "name": "Grassland",
+        "temperature": 20,
+        "precipitation": 60,
+        "vegetation_density": 0,
+        "terrain_type": "Grassland",
+        "area": 2912,
+        "color": [
+            21,
+            160,
+            105
+        ]
+    },
+    "13": {
+        "name": "Tundra",
+        "temperature": 0,
+        "precipitation": 30,
+        "vegetation_density": 0,
+        "terrain_type": "Tundra",
+        "area": 37070,
+        "color": [
+            31,
+            241,
+            84
+        ]
+    },
+    "14": {
+        "name": "Tundra",
+        "temperature": 0,
+        "precipitation": 30,
+        "vegetation_density": 0,
+        "terrain_type": "Tundra",
+        "area": 10735,
+        "color": [
+            31,
+            241,
+            84
+        ]
+    },
+    "15": {
+        "name": "Tundra",
+        "temperature": 0,
+        "precipitation": 30,
+        "vegetation_density": 0,
+        "terrain_type": "Tundra",
+        "area": 10678,
+        "color": [
+            31,
+            241,
+            84
+        ]
+    },
+    "16": {
+        "name": "Tundra",
+        "temperature": 0,
+        "precipitation": 30,
+        "vegetation_density": 0,
+        "terrain_type": "Tundra",
+        "area": 659,
+        "color": [
+            31,
+            241,
+            84
+        ]
+    },
+    "17": {
+        "name": "Swamp",
+        "temperature": 20,
+        "precipitation": 150,
+        "vegetation_density": 0,
+        "terrain_type": "Swamp",
+        "area": 1529,
+        "color": [
+            36,
+            171,
+            65
+        ]
+    },
+    "18": {
+        "name": "Swamp",
+        "temperature": 20,
+        "precipitation": 150,
+        "vegetation_density": 0,
+        "terrain_type": "Swamp",
+        "area": 8222,
+        "color": [
+            36,
+            171,
+            65
+        ]
+    },
+    "19": {
+        "name": "Swamp",
+        "temperature": 20,
+        "precipitation": 150,
+        "vegetation_density": 0,
+        "terrain_type": "Swamp",
+        "area": 4994,
+        "color": [
+            36,
+            171,
+            65
+        ]
+    },
+    "20": {
+        "name": "Swamp",
+        "temperature": 20,
+        "precipitation": 150,
+        "vegetation_density": 0,
+        "terrain_type": "Swamp",
+        "area": 11266,
+        "color": [
+            36,
+            171,
+            65
+        ]
+    },
+    "21": {
+        "name": "Swamp",
+        "temperature": 20,
+        "precipitation": 150,
+        "vegetation_density": 0,
+        "terrain_type": "Swamp",
+        "area": 12786,
+        "color": [
+            36,
+            171,
+            65
+        ]
+    },
+    "22": {
+        "name": "Cave",
+        "temperature": 10,
+        "precipitation": 20,
+        "vegetation_density": 0,
+        "terrain_type": "Cave",
+        "area": 411,
+        "color": [
+            98,
+            155,
+            118
+        ]
+    },
+    "23": {
+        "name": "Cave",
+        "temperature": 10,
+        "precipitation": 20,
+        "vegetation_density": 0,
+        "terrain_type": "Cave",
+        "area": 612,
+        "color": [
+            98,
+            155,
+            118
+        ]
+    },
+    "24": {
+        "name": "Cave",
+        "temperature": 10,
+        "precipitation": 20,
+        "vegetation_density": 0,
+        "terrain_type": "Cave",
+        "area": 4204,
+        "color": [
+            98,
+            155,
+            118
+        ]
+    },
+    "25": {
+        "name": "Cave",
+        "temperature": 10,
+        "precipitation": 20,
+        "vegetation_density": 0,
+        "terrain_type": "Cave",
+        "area": 15187,
+        "color": [
+            98,
+            155,
+            118
+        ]
+    },
+    "26": {
+        "name": "Cave",
+        "temperature": 10,
+        "precipitation": 20,
+        "vegetation_density": 0,
+        "terrain_type": "Cave",
+        "area": 14725,
+        "color": [
+            98,
+            155,
+            118
+        ]
+    },
+    "27": {
+        "name": "Cave",
+        "temperature": 10,
+        "precipitation": 20,
+        "vegetation_density": 0,
+        "terrain_type": "Cave",
+        "area": 7355,
+        "color": [
+            98,
+            155,
+            118
+        ]
+    },
+    "28": {
+        "name": "Forest",
+        "temperature": 25,
+        "precipitation": 100,
+        "vegetation_density": 0,
+        "terrain_type": "Forest",
+        "area": 19709,
+        "color": [
+            153,
+            123,
+            123
+        ]
+    },
+    "29": {
+        "name": "Forest",
+        "temperature": 25,
+        "precipitation": 100,
+        "vegetation_density": 0,
+        "terrain_type": "Forest",
+        "area": 862,
+        "color": [
+            153,
+            123,
+            123
+        ]
+    },
+    "30": {
+        "name": "Forest",
+        "temperature": 25,
+        "precipitation": 100,
+        "vegetation_density": 0,
+        "terrain_type": "Forest",
+        "area": 11397,
+        "color": [
+            153,
+            123,
+            123
+        ]
+    },
+    "31": {
+        "name": "Forest",
+        "temperature": 25,
+        "precipitation": 100,
+        "vegetation_density": 0,
+        "terrain_type": "Forest",
+        "area": 6309,
+        "color": [
+            153,
+            123,
+            123
+        ]
+    },
+    "32": {
+        "name": "Forest",
+        "temperature": 25,
+        "precipitation": 100,
+        "vegetation_density": 0,
+        "terrain_type": "Forest",
+        "area": 4923,
+        "color": [
+            153,
+            123,
+            123
+        ]
+    },
+    "33": {
+        "name": "Forest",
+        "temperature": 25,
+        "precipitation": 100,
+        "vegetation_density": 0,
+        "terrain_type": "Forest",
+        "area": 9333,
+        "color": [
+            153,
+            123,
+            123
+        ]
+    },
+    "34": {
+        "name": "Forest",
+        "temperature": 25,
+        "precipitation": 100,
+        "vegetation_density": 0,
+        "terrain_type": "Forest",
+        "area": 733,
+        "color": [
+            153,
+            123,
+            123
+        ]
+    }
+}

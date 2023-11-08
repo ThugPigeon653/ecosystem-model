@@ -725,7 +725,10 @@ class Animals:
 
 def load_json_data(path):
     with open(path, "r") as json_data:
-        data=json.load(json_data)
+        try:
+            data=json.load(json_data)
+        except Exception as e:
+            print(f"*********{os.path.dirname(__file__)}*********")
         return data
 
 def initialize(test:bool=False):

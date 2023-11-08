@@ -19,7 +19,7 @@ jobs:
           python-version: 3.x
 
       - name: Install dependancies
-        run: pip install PyQt5 opencv-python numpy pillow scipy matplotlib
+        run: pip install PyQt5 opencv-python numpy pillow scipy matplotlib pytest
 
       - name: Run tests
         run: pytest test/test_ecosytem.py

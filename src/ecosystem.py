@@ -20,6 +20,7 @@ conn = Connection.get_connection()
 class Pregnancy:
     def __init__(self):
         self.cursor = conn.cursor()
+        self.cursor.execute('DROP TABLE IF EXISTS pregnancy')
         self.cursor.execute('''
             CREATE TABLE pregnancy (
                 mother_id INTEGER NOT NULL,
@@ -734,7 +735,7 @@ def load_json_data(path):
         data=json.load(json_data)
         return data
 
-def initialize():
+def initialize(test:bool=False):
     terrain_manager = Terrain()
     terrain_data = load_json_data("config/terrain.json")
     biomes: list[int] = []
@@ -772,63 +773,63 @@ def initialize():
     with open('config/shared_runtime_config.json', 'r') as file:
         config = json.load(file)
         config["today"] = 0
-
-    try:
-        while i < 50:
-            startvation:int=0
-            gotkilled:int=0
-            fromage:int=0
-            animal_counts_by_year[i] = {}  # Create a dictionary for this year
-            for terrain_id in biomes:
-                animal_counts_by_year[i][terrain_id] = {}  # Create a dictionary for this terrain_id
-                for animal_type in animals:
-                    count = animal_manager.count_animals_by_type(animal_type, terrain_id)
-                    animal_counts_by_year[i][terrain_id][animal_type] = count
-            config["today"] = i
-            with open('config/shared_runtime_config.json', 'w') as file:
-                json.dump(config, file, indent=4)
-            animal_manager.today = i
-            for animal_id in animal_manager.get_feeding_order():
-                cursor = conn.cursor()
-                cursor.execute('SELECT name, born, old_age FROM animals WHERE id = ?', animal_id)
-                vals = cursor.fetchone()
-                if vals is not None:
-                    name, born, old_age = vals
-                    energy = animal_manager.get_energy_after_day_consumed(animal_id[0])
-                    cursor.execute("UPDATE Animals SET energy=? WHERE id=?", (energy, animal_id[0]))
-                    if energy > 0:
-                        if born + old_age <= i:
-                            cursor.execute('DELETE FROM animals WHERE id = ?', animal_id)
-                            fromage+=1
+    if test!=True:
+        try:
+            while i < 50:
+                startvation:int=0
+                gotkilled:int=0
+                fromage:int=0
+                animal_counts_by_year[i] = {}  # Create a dictionary for this year
+                for terrain_id in biomes:
+                    animal_counts_by_year[i][terrain_id] = {}  # Create a dictionary for this terrain_id
+                    for animal_type in animals:
+                        count = animal_manager.count_animals_by_type(animal_type, terrain_id)
+                        animal_counts_by_year[i][terrain_id][animal_type] = count
+                config["today"] = i
+                with open('config/shared_runtime_config.json', 'w') as file:
+                    json.dump(config, file, indent=4)
+                animal_manager.today = i
+                for animal_id in animal_manager.get_feeding_order():
+                    cursor = conn.cursor()
+                    cursor.execute('SELECT name, born, old_age FROM animals WHERE id = ?', animal_id)
+                    vals = cursor.fetchone()
+                    if vals is not None:
+                        name, born, old_age = vals
+                        energy = animal_manager.get_energy_after_day_consumed(animal_id[0])
+                        cursor.execute("UPDATE Animals SET energy=? WHERE id=?", (energy, animal_id[0]))
+                        if energy > 0:
+                            if born + old_age <= i:
+                                cursor.execute('DELETE FROM animals WHERE id = ?', animal_id)
+                                fromage+=1
+                            else:
+                                encounters_for_animal = animal_manager.get_encounters_in_day(animal_id[0])
+                                for encounter in encounters_for_animal:
+                                    interaction = animal_manager.execute_interaction(animal_id[0], encounter[0])
+                                    if interaction is not None:
+                                        if("illed" in interaction):
+                                            gotkilled+=1
+                                        logger.log(str(i) + " " + interaction, logging.INFO)
+                                if(random.randint(0,1000*int(len(encounters_for_animal)*animal_manager.migration))==0):
+                                    new_terrain:int=biomes[random.randint(0,len(biomes)-1)]
+                                    cursor.execute("UPDATE Animals SET terrain_id=? WHERE id=?", (new_terrain, animal_id[0]))
+                                    try:
+                                        if("Grass" in animal_manager.list_prey(animal_id[0])):
+                                            cursor.execute("UPDATE Animals SET energy=? WHERE id=?", (100, animal_id[0]))
+                                    except:
+                                        print("Failed to get prey for "+name)
                         else:
-                            encounters_for_animal = animal_manager.get_encounters_in_day(animal_id[0])
-                            for encounter in encounters_for_animal:
-                                interaction = animal_manager.execute_interaction(animal_id[0], encounter[0])
-                                if interaction is not None:
-                                    if("illed" in interaction):
-                                        gotkilled+=1
-                                    logger.log(str(i) + " " + interaction, logging.INFO)
-                            if(random.randint(0,1000*int(len(encounters_for_animal)*animal_manager.migration))==0):
-                                new_terrain:int=biomes[random.randint(0,len(biomes)-1)]
-                                cursor.execute("UPDATE Animals SET terrain_id=? WHERE id=?", (new_terrain, animal_id[0]))
-                                try:
-                                    if("Grass" in animal_manager.list_prey(animal_id[0])):
-                                        cursor.execute("UPDATE Animals SET energy=? WHERE id=?", (100, animal_id[0]))
-                                except:
-                                    print("Failed to get prey for "+name)
-                    else:
-                        cursor.execute('DELETE FROM animals WHERE id = ?', animal_id)
-                        startvation+=1
-            logger.log(animal_manager.get_all_animals(), logging.INFO)
-            print(f"Year {i}   Eaten: {gotkilled}    OldAge: {fromage}    Starve: {startvation}")
-            i += 1
-    finally:
-        print(f"Eaten: {gotkilled}    OldAge: {fromage}    Starve: {startvation}")
-        conn.close()
-        logger.log("Database connection closed.", logging.INFO)
-        with open('logs/animal_counts_by_year.json', 'w') as counts_file:
-            json.dump(animal_counts_by_year, counts_file, indent=4)
-        print("Simulation complete")
+                            cursor.execute('DELETE FROM animals WHERE id = ?', animal_id)
+                            startvation+=1
+                logger.log(animal_manager.get_all_animals(), logging.INFO)
+                print(f"Year {i}   Eaten: {gotkilled}    OldAge: {fromage}    Starve: {startvation}")
+                i += 1
+        finally:
+            print(f"Eaten: {gotkilled}    OldAge: {fromage}    Starve: {startvation}")
+            conn.close()
+            logger.log("Database connection closed.", logging.INFO)
+            with open('logs/animal_counts_by_year.json', 'w') as counts_file:
+                json.dump(animal_counts_by_year, counts_file, indent=4)
+            print("Simulation complete")
 
 
 

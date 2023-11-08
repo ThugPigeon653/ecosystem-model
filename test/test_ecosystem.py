@@ -1,11 +1,8 @@
 import unittest
-from unittest.mock import patch
 import src.ecosystem as eco
-import sys
 
 class TestEcosystem(unittest.TestCase):
     def setUp(self):
-        print(sys.path)
         eco.initialize(True)
 
     def test_insert_pregnancy(self):

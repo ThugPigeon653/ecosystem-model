@@ -7,21 +7,16 @@
 import json
 import random
 import os
-from db_connection import Connection
-import logger as log
-from logger import logging 
-
-logger=log.MyLogger('ecosystem.txt')
+import sqlite3
 
 if os.path.exists('animal_database.db'):
     os.remove('animal_database.db')
-conn = Connection.get_connection()
+conn:sqlite3.Cursor=sqlite3.connect('animal_database.db').cursor() 
 
 class Pregnancy:
     def __init__(self):
-        self.cursor = conn.cursor()
-        self.cursor.execute('DROP TABLE IF EXISTS pregnancy')
-        self.cursor.execute('''
+        conn.execute('DROP TABLE IF EXISTS pregnancy')
+        conn.execute('''
             CREATE TABLE pregnancy (
                 mother_id INTEGER NOT NULL,
                 father_id INTEGER NOT NULL,
@@ -29,36 +24,36 @@ class Pregnancy:
                 PRIMARY KEY(mother_id)
             )
         ''')
-        conn.commit()
+        
 
     def insert_pregnancy(self, mother_id:int, father_id:int, today):
-        self.cursor.execute('SELECT weight, birth_rate FROM animals WHERE id = ?', (mother_id,))
-        weight, birth_rate=self.cursor.fetchone()
+        conn.execute('SELECT weight, birth_rate FROM animals WHERE id = ?', (mother_id,))
+        weight, birth_rate=conn.fetchone()
         expiry=int(((0.8*weight)+today)/(birth_rate))
-        self.cursor.execute('''
+        conn.execute('''
             INSERT INTO pregnancy (mother_id, father_id, expiry)
             VALUES (?, ?, ?)
         ''', (mother_id, father_id, expiry))
-        conn.commit()
-        return self.cursor.lastrowid
+        
+        return conn.lastrowid
     
     def is_able_to_conceive(self, animal_id:int, today:int):
-        self.cursor.execute('SELECT breeding_lifecycle, old_age, born, is_male FROM Animals WHERE id = ?', (animal_id,))
-        breeding_lifecycle, old_age, born, is_male=self.cursor.fetchone()
+        conn.execute('SELECT breeding_lifecycle, old_age, born, is_male FROM Animals WHERE id = ?', (animal_id,))
+        breeding_lifecycle, old_age, born, is_male=conn.fetchone()
         can_breed:bool=False
         if(((breeding_lifecycle*old_age)+born)<=today):
             if(is_male):
                 can_breed=True
             else:
-                self.cursor.execute('SELECT expiry FROM pregnancy WHERE mother_id = ?', (animal_id,))
-                exp=self.cursor.fetchone()
+                conn.execute('SELECT expiry FROM pregnancy WHERE mother_id = ?', (animal_id,))
+                exp=conn.fetchone()
                 if(exp!= None):
                     expiry:int=exp[0]
                 else:
                     expiry=None
                 if(expiry!=None):
                     if(expiry<today):
-                        self.cursor.execute('DELETE FROM pregnancy WHERE mother_id = ?',(animal_id,))
+                        conn.execute('DELETE FROM pregnancy WHERE mother_id = ?',(animal_id,))
                         can_breed=True
                 else:
                     can_breed=True
@@ -66,9 +61,8 @@ class Pregnancy:
     
 class Terrain:
     def __init__(self):
-        self.cursor = conn.cursor()
-        self.cursor.execute('DROP TABLE IF EXISTS Terrain')
-        self.cursor.execute('''
+        conn.execute('DROP TABLE IF EXISTS Terrain')
+        conn.execute('''
             CREATE TABLE terrain (
                 id INTEGER PRIMARY KEY,
                 name TEXT NOT NULL,
@@ -80,19 +74,19 @@ class Terrain:
                 color TEXT
             )
         ''')
-        conn.commit()
+        
 
     def create_new_terrain(self, name:str, temperature:float, precipitation:float, vegetation_density:float, terrain_type:str, area:float, color:str):
-        self.cursor.execute('''
+        conn.execute('''
             INSERT INTO terrain (name, temperature, precipitation, vegetation_density, terrain_type, area)
             VALUES (?, ?, ?, ?, ?, ?)
         ''', (name, temperature, precipitation, vegetation_density, terrain_type, area))
-        conn.commit()
-        return self.cursor.lastrowid
+        
+        return conn.lastrowid
 
     def get_terrain_attributes(self, terrain_id):
-        self.cursor.execute('SELECT name, temperature, precipitation, vegetation_density, terrain_type, area FROM terrain WHERE id = ?', (terrain_id,))
-        terrain_data = self.cursor.fetchone()
+        conn.execute('SELECT name, temperature, precipitation, vegetation_density, terrain_type, area FROM terrain WHERE id = ?', (terrain_id,))
+        terrain_data = conn.fetchone()
         if terrain_data:
             name, temperature, precipitation, vegetation_density, terrain_type, area = terrain_data
 
@@ -116,9 +110,8 @@ class Animals:
     __pregnancy_manager:Pregnancy
 
     def __init__(self):
-        self.cursor = conn.cursor()
-        self.cursor.execute('DROP TABLE IF EXISTS animals')
-        self.cursor.execute('''
+        conn.execute('DROP TABLE IF EXISTS animals')
+        conn.execute('''
             CREATE TABLE animals (
                 id INTEGER PRIMARY KEY,
                 name TEXT NOT NULL,
@@ -149,7 +142,7 @@ class Animals:
                 is_male BOOL CHECK(is_male=True or is_male=False)
             )
         ''')
-        conn.commit()
+        
 
     @property
     def today(self):
@@ -191,7 +184,7 @@ class Animals:
                           terrain_id, birth_rate, litter_size, born, ear_size, ear_injury, survival_days:int, food_intake:int, energy:float, is_male:bool=None):
         if(is_male==None):
             is_male=random.choice([True, False])
-        self.cursor.execute('''
+        conn.execute('''
             INSERT INTO animals (name, relative_strength, eye_size, mouth_size, weight, energy_capacity, endurance,
             num_teeth, avg_old_age, old_age, breeding_lifecycle, eye_injury, leg_injury, mouth_injury, general_injury, prey_relationships, terrain_id, birth_rate, litter_size, born, ear_size, ear_injury, survival_days, food_intake, energy, is_male)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -199,13 +192,12 @@ class Animals:
               old_age, breeding_lifecycle, eye_injury, leg_injury, mouth_injury, general_injury, json.dumps(prey_relationships), terrain_id, birth_rate, litter_size, born, ear_size, ear_injury, survival_days,
                food_intake, energy, is_male))
 
-        conn.commit()
-        logger.log("Created "+name+" ("+str(self.cursor.lastrowid)+")\033[0m", logging.INFO)
-        return self.cursor.lastrowid
+        
+        return conn.lastrowid
 
     def get_animal_attributes(self, animal_id):
-        self.cursor.execute('SELECT * FROM animals WHERE id = ?', (animal_id,))
-        animal_data = self.cursor.fetchone()
+        conn.execute('SELECT * FROM animals WHERE id = ?', (animal_id,))
+        animal_data = conn.fetchone()
         if animal_data:
             id, name, relative_strength, eye_size, mouth_size, weight, energy_capacity, endurance, num_teeth, avg_old_age, old_age, breeding_lifecycle, eye_injury, leg_injury, mouth_injury, general_injury, prey_relationships_json, terrain_id, birth_rate, litter_size, born, ear_size, ear_injury, survival_days, food_intake, energy, is_male = animal_data
 
@@ -262,7 +254,7 @@ class Animals:
             return None
     
     def delete_animal(self, animal_id:int):
-        self.cursor.execute('DELETE FROM Animals WHERE id = ?', (animal_id,))
+        conn.execute('DELETE FROM Animals WHERE id = ?', (animal_id,))
 
     def create_child_animal(self, parent1_id:int, parent2_id:int, is_parent1_male:bool):
         parent1_attributes = self.get_animal_attributes(parent1_id)
@@ -419,8 +411,8 @@ class Animals:
                 litter_size-=1
     
     def get_all_animals(self):
-        self.cursor.execute('SELECT * FROM animals')
-        all_animals = self.cursor.fetchall()
+        conn.execute('SELECT * FROM animals')
+        all_animals = conn.fetchall()
 
         animals_list = []
         for animal_data in all_animals:
@@ -461,8 +453,8 @@ class Animals:
         return animals_list
 
     def get_age_modifier(self, animal_id)->float:
-        self.cursor.execute('SELECT old_age, born FROM animals WHERE id = ?', (animal_id,))
-        animal_data = self.cursor.fetchone()
+        conn.execute('SELECT old_age, born FROM animals WHERE id = ?', (animal_id,))
+        animal_data = conn.fetchone()
         old_age, born = animal_data
         mid_age=old_age/2
         current_age=self.today-born
@@ -480,39 +472,39 @@ class Animals:
         return modifier
 
     def get_distance_travelled_in_day(self, animal_id)->float:
-        self.cursor.execute('SELECT eye_size, weight, endurance, terrain_id FROM animals WHERE id = ?', (animal_id,))
-        animal_data = self.cursor.fetchone()
+        conn.execute('SELECT eye_size, weight, endurance, terrain_id FROM animals WHERE id = ?', (animal_id,))
+        animal_data = conn.fetchone()
         eye_size, weight, endurance, terrain_id = animal_data
-        self.cursor.execute('SELECT vegetation_density from terrain WHERE id = ?', (terrain_id,))
-        vegetation=self.cursor.fetchone()[0]
+        conn.execute('SELECT vegetation_density from terrain WHERE id = ?', (terrain_id,))
+        vegetation=conn.fetchone()[0]
         distance=weight*endurance*0.4*eye_size*self.get_age_modifier(animal_id)/(1+vegetation)
         return distance
     
     def get_species(self, animal_id):
-        self.cursor.execute('SELECT name FROM Animals WHERE id = ?', (animal_id,))
-        return self.cursor.fetchone()[0]
+        conn.execute('SELECT name FROM Animals WHERE id = ?', (animal_id,))
+        return conn.fetchone()[0]
 
     def get_land_covered_in_day(self, animal_id)->float:
-        self.cursor.execute('SELECT eye_size, eye_injury, ear_size, ear_injury from Animals WHERE id = ?', (animal_id,))
-        eye_size, eye_injury, ear_size, ear_injury=self.cursor.fetchone()
+        conn.execute('SELECT eye_size, eye_injury, ear_size, ear_injury from Animals WHERE id = ?', (animal_id,))
+        eye_size, eye_injury, ear_size, ear_injury=conn.fetchone()
         distance:float=self.get_distance_travelled_in_day(animal_id)
         search_radius=max(ear_size/((1-ear_injury)/10), eye_size/((1-eye_injury)/10))
         return distance*search_radius
 
     def get_encounter_odds_in_day(self, animal_id) -> float:
-        self.cursor.execute('SELECT terrain_id FROM Animals WHERE id = ?', (animal_id,))
-        terrain_id = self.cursor.fetchone()[0]
-        self.cursor.execute('SELECT area FROM Terrain WHERE id = ?', (terrain_id,))
-        terrain_area = self.cursor.fetchone()[0]
-        self.cursor.execute('SELECT count(*) FROM Animals WHERE terrain_id = ?', (terrain_id,))
-        animal_count = self.cursor.fetchone()[0]
+        conn.execute('SELECT terrain_id FROM Animals WHERE id = ?', (animal_id,))
+        terrain_id = conn.fetchone()[0]
+        conn.execute('SELECT area FROM Terrain WHERE id = ?', (terrain_id,))
+        terrain_area = conn.fetchone()[0]
+        conn.execute('SELECT count(*) FROM Animals WHERE terrain_id = ?', (terrain_id,))
+        animal_count = conn.fetchone()[0]
         population_density = animal_count / terrain_area
         land_covered = self.get_land_covered_in_day(animal_id)
         return population_density*land_covered
 
     def get_encounters_in_day(self, animal_id:int)->list[int]:
-        self.cursor.execute('SELECT terrain_id FROM Animals WHERE id = ?', (animal_id,))
-        terran_tuple=self.cursor.fetchone()
+        conn.execute('SELECT terrain_id FROM Animals WHERE id = ?', (animal_id,))
+        terran_tuple=conn.fetchone()
         animals_encountered:list[int]=[]
         if(terran_tuple!=None):
             terrain_id=terran_tuple[0]
@@ -520,19 +512,19 @@ class Animals:
             luck_factor=random.uniform(0.10, 1.90)
             odds=odds*luck_factor
             discreet_encounters:int=int(odds)
-            self.cursor.execute('SELECT id from Animals WHERE terrain_id = ? AND id != ? ORDER BY RANDOM() LIMIT ?',(terrain_id, animal_id, discreet_encounters))
-            animals_encountered=self.cursor.fetchall()
+            conn.execute('SELECT id from Animals WHERE terrain_id = ? AND id != ? ORDER BY RANDOM() LIMIT ?',(terrain_id, animal_id, discreet_encounters))
+            animals_encountered=conn.fetchall()
         return animals_encountered
 
     def get_does_see_animal(self, predator_id:int, prey_id:int)->(bool, bool):
-        self.cursor.execute('SELECT eye_size, weight, eye_injury, leg_injury, general_injury, terrain_id, ear_size, ear_injury from Animals WHERE id = ?', (predator_id,))
-        eye_size, weight, eye_injury, leg_injury, general_injury, terrain_id, ear_size, ear_injury=self.cursor.fetchone()
-        terrain_density=self.cursor.execute('SELECT vegetation_density from terrain WHERE id = ?', terrain_id)
+        conn.execute('SELECT eye_size, weight, eye_injury, leg_injury, general_injury, terrain_id, ear_size, ear_injury from Animals WHERE id = ?', (predator_id,))
+        eye_size, weight, eye_injury, leg_injury, general_injury, terrain_id, ear_size, ear_injury=conn.fetchone()
+        terrain_density=conn.execute('SELECT vegetation_density from terrain WHERE id = ?', terrain_id)
         predator_defense_score:float=((((eye_size*((10-eye_injury)/10)+(ear_size*((10-ear_injury)/10)))-((10-leg_injury)/10)*1.1)-(weight/1000))/(1+terrain_density))
         predator_offense_score:float=predator_defense_score*((10-general_injury)/10)
 
-        self.cursor.execute('SELECT eye_size, weight, eye_injury, leg_injury, general_injury, terrain_id, ear_size, ear_injury from Animals WHERE id = ?', (prey_id,))
-        eye_size, weight, eye_injury, leg_injury, general_injury, terrain_id, ear_size, ear_injury=self.cursor.fetchone()
+        conn.execute('SELECT eye_size, weight, eye_injury, leg_injury, general_injury, terrain_id, ear_size, ear_injury from Animals WHERE id = ?', (prey_id,))
+        eye_size, weight, eye_injury, leg_injury, general_injury, terrain_id, ear_size, ear_injury=conn.fetchone()
         prey_defense_score:float=(((eye_size*((10-eye_injury)/10)+(ear_size*((10-ear_injury)/10)))-((10-leg_injury)/10)*0.8)-(weight/1000))/(1+terrain_density)
         prey_offense_score:float=prey_defense_score*((10-general_injury)/10)
         predator_offense_score=random.uniform(0.000, predator_offense_score)
@@ -552,12 +544,12 @@ class Animals:
     def get_does_chase_animal(self, predator_id:int, prey_id:int)->bool:
         will_chase:bool=None
         if(predator_id!=None and prey_id!=None):
-            self.cursor.execute('SELECT prey_relationships, weight FROM Animals WHERE id = ?', (predator_id,))
-            result=self.cursor.fetchone()
+            conn.execute('SELECT prey_relationships, weight FROM Animals WHERE id = ?', (predator_id,))
+            result=conn.fetchone()
             if(result!=None):
                 prey_relationships, weight = result
-                self.cursor.execute('SELECT name, weight FROM Animals WHERE id = ?', (prey_id,))
-                animal_data=self.cursor.fetchone()
+                conn.execute('SELECT name, weight FROM Animals WHERE id = ?', (prey_id,))
+                animal_data=conn.fetchone()
                 if(animal_data!=None):
                     name,prey_weight=animal_data
                     if(name in prey_relationships.split(',')):
@@ -572,13 +564,13 @@ class Animals:
         return will_chase
 
     def get_does_catch_animal(self, predator_id:int, prey_id:int)->bool:
-        self.cursor.execute('SELECT relative_strength, weight, energy_capacity, endurance, leg_injury, general_injury, terrain_id FROM Animals WHERE id = ?', (predator_id,))
-        relative_strength, weight, energy_capacity, endurance, leg_injury, general_injury, terrain_id=self.cursor.fetchone()
-        self.cursor.execute('SELECT vegetation_density FROM terrain WHERE id = ?', (terrain_id,))
-        vegetation_density=self.cursor.fetchone()[0]
+        conn.execute('SELECT relative_strength, weight, energy_capacity, endurance, leg_injury, general_injury, terrain_id FROM Animals WHERE id = ?', (predator_id,))
+        relative_strength, weight, energy_capacity, endurance, leg_injury, general_injury, terrain_id=conn.fetchone()
+        conn.execute('SELECT vegetation_density FROM terrain WHERE id = ?', (terrain_id,))
+        vegetation_density=conn.fetchone()[0]
         predator_score=((((relative_strength**0.5)*energy_capacity)/(weight*((22-leg_injury-general_injury)/20)))*endurance)/(1+vegetation_density)
-        self.cursor.execute('SELECT relative_strength, weight, energy_capacity, endurance, leg_injury, general_injury FROM Animals WHERE id = ?', (prey_id,))
-        relative_strength, weight, energy_capacity, endurance, leg_injury, general_injury = self.cursor.fetchone()
+        conn.execute('SELECT relative_strength, weight, energy_capacity, endurance, leg_injury, general_injury FROM Animals WHERE id = ?', (prey_id,))
+        relative_strength, weight, energy_capacity, endurance, leg_injury, general_injury = conn.fetchone()
         try:
             prey_score=((((relative_strength**0.5)*energy_capacity)/(weight*((22-leg_injury-general_injury)/20)))*endurance)/(1+vegetation_density)
         except Exception as e:
@@ -593,8 +585,8 @@ class Animals:
         return catches_prey
 
     def list_prey(self, animal_id:str)->list[str]:
-        self.cursor.execute('SELECT prey_relationships FROM Animals WHERE id = ?',(animal_id,))
-        ans=self.cursor.fetchone()
+        conn.execute('SELECT prey_relationships FROM Animals WHERE id = ?',(animal_id,))
+        ans=conn.fetchone()
         if ans!=None:
             return ans[0].replace(" ", "").split(',')
         else: 
@@ -607,12 +599,12 @@ class Animals:
         if(predator_id!=None and prey_id!=None):
             predator_age=self.get_age_modifier(predator_id)
             prey_age=self.get_age_modifier(prey_id)
-            self.cursor.execute('SELECT name, relative_strength, mouth_size, weight, energy_capacity, endurance, num_teeth from Animals WHERE id = ?', (predator_id,))
-            predator_name, relative_strength, mouth_size, weight, energy_capacity, endurance, num_teeth = self.cursor.fetchone()
+            conn.execute('SELECT name, relative_strength, mouth_size, weight, energy_capacity, endurance, num_teeth from Animals WHERE id = ?', (predator_id,))
+            predator_name, relative_strength, mouth_size, weight, energy_capacity, endurance, num_teeth = conn.fetchone()
             p_weight=weight
             predator_score:float = random.uniform(0.01, (relative_strength**0.5)*mouth_size*(num_teeth**1.1)*(endurance**0.9)*(energy_capacity**0.9)*(weight**0.5))
-            self.cursor.execute('SELECT name, relative_strength, mouth_size, weight, energy_capacity, endurance, num_teeth from Animals WHERE id = ?', (prey_id,))
-            prey_name, relative_strength, mouth_size, weight, energy_capacity, endurance, num_teeth = self.cursor.fetchone()
+            conn.execute('SELECT name, relative_strength, mouth_size, weight, energy_capacity, endurance, num_teeth from Animals WHERE id = ?', (prey_id,))
+            prey_name, relative_strength, mouth_size, weight, energy_capacity, endurance, num_teeth = conn.fetchone()
             prey_score:float = random.uniform(0.01, (relative_strength**0.55)*(mouth_size**0.9)*(num_teeth**0.9)*(endurance**1.1)*energy_capacity*(weight**0.5))
             outcome = predator_score-prey_score
             final_result=(outcome/predator_score)
@@ -625,8 +617,8 @@ class Animals:
                     victim=predator_id
                 column_name = injury_types[injury_roll] + "_injury"
                 query = 'SELECT {} FROM Animals WHERE id = ?'.format(column_name)
-                self.cursor.execute(query, (victim,))
-                injury=self.cursor.fetchone()[0]
+                conn.execute(query, (victim,))
+                injury=conn.fetchone()[0]
                 if((injury+final_result)<10):
                     injury=injury+final_result
                 else:
@@ -634,7 +626,7 @@ class Animals:
                 injury=int(injury*((100-random.randint(0, self.savagery))/100))
                 column_name = injury_types[injury_roll] + "_injury"
                 query = 'UPDATE Animals SET {} = ? WHERE id = ?'.format(column_name)
-                self.cursor.execute(query, (injury, victim))
+                conn.execute(query, (injury, victim))
                 return_value=("\n\033[93m"+str(victim)+ " has been injured\033[0m("+str(final_result))
             elif(abs(outcome)>=0.7):
                 if(random.randint(0,100)<=self.savagery):
@@ -655,30 +647,29 @@ class Animals:
                             killed_mass=p_weight
                     if(killed_mass!=0):
                         prey:list[str]=self.list_prey(victor)
-                        self.cursor.execute('SELECT name FROM Animals WHERE id=?',(victim,))
-                        if(self.cursor.fetchone() in prey):
-                            self.cursor.execute('SELECT survival_days, weight, food_intake, energy, prey_relationships FROM Animals WHERE id =?', (victor,))
-                            sd,w,fi,e=self.cursor.fetchone()
+                        conn.execute('SELECT name FROM Animals WHERE id=?',(victim,))
+                        if(conn.fetchone() in prey):
+                            conn.execute('SELECT survival_days, weight, food_intake, energy, prey_relationships FROM Animals WHERE id =?', (victor,))
+                            sd,w,fi,e=conn.fetchone()
                             daily_req=(fi/100)*w
                             e=min(100,e+(killed_mass/daily_req)*(sd/100))
                     return_value=("\n\033[91m"+str(victim)+ " has been killed\033[0m")
         return return_value
 
     def get_animal_current_hunger_for_kg(self, animal_id:int)->float:
-        self.cursor.execute('SELECT survival_days, food_intake, energy, weight FROM Animals WHERE id = ?', (animal_id,))
-        sd, fi, en, w = self.cursor.fetchone()
+        conn.execute('SELECT survival_days, food_intake, energy, weight FROM Animals WHERE id = ?', (animal_id,))
+        sd, fi, en, w = conn.fetchone()
         return ((en)/(sd/100))*(w*fi)
 
     def execute_interaction(self, predator_id:int, prey_id:int):
-        self.cursor.execute('SELECT name, is_male FROM Animals WHERE id = ?', (predator_id,))
-        data=self.cursor.fetchone()
+        conn.execute('SELECT name, is_male FROM Animals WHERE id = ?', (predator_id,))
+        data=conn.fetchone()
         outcome=None
         if(data!=None):
             predator_name, predator_is_male=data
-            self.cursor.execute('SELECT name, is_male FROM Animals WHERE id = ?', (prey_id,))
-            prey_name, prey_is_male=self.cursor.fetchone()
+            conn.execute('SELECT name, is_male FROM Animals WHERE id = ?', (prey_id,))
+            prey_name, prey_is_male=conn.fetchone()
             status:str=f"No interaction eventuated between {predator_name} and {prey_name}. "
-            logger.log(predator_name + " found a "+prey_name,logging.INFO)
             conception:bool=False
             protected_by_sexual_interest:bool=False
             if(predator_name==prey_name and predator_is_male!=prey_is_male and random.randint(0,100)<=self.birth_tuner):
@@ -716,19 +707,19 @@ class Animals:
         return status
 
     def get_feeding_order(self):
-        self.cursor.execute('SELECT id FROM Animals ORDER BY RANDOM()')
-        return self.cursor.fetchall()
+        conn.execute('SELECT id FROM Animals ORDER BY RANDOM()')
+        return conn.fetchall()
 
     def get_energy_after_day_consumed(self, animal_id:int):
-        self.cursor.execute('SELECT energy, survival_days FROM Animals where id=?', (animal_id,))
-        energy, sd = self.cursor.fetchone()
+        conn.execute('SELECT energy, survival_days FROM Animals where id=?', (animal_id,))
+        energy, sd = conn.fetchone()
         energy-=100/sd
         return energy
 
     def count_animals_by_type(self, animal_type, terrain_id):
         query = 'SELECT COUNT(*) FROM animals WHERE name = ? AND terrain_id = ?'
-        self.cursor.execute(query, (animal_type, terrain_id))
-        count = self.cursor.fetchone()[0]
+        conn.execute(query, (animal_type, terrain_id))
+        count = conn.fetchone()[0]
         return count
 
 
@@ -742,7 +733,6 @@ def initialize(test:bool=False):
     terrain_data = load_json_data("config/terrain.json")
     biomes: list[int] = []
     for terrain_name, terrain_attributes in terrain_data.items():
-        logger.log(terrain_attributes, logging.info)
         terrain_id = terrain_manager.create_new_terrain(**terrain_attributes)
         biomes.append(terrain_id)
         with open('config/animals.json', 'r') as file:
@@ -810,7 +800,6 @@ def initialize(test:bool=False):
                                     if interaction is not None:
                                         if("illed" in interaction):
                                             gotkilled+=1
-                                        logger.log(str(i) + " " + interaction, logging.INFO)
                                 if(random.randint(0,1000*int(len(encounters_for_animal)*animal_manager.migration))==0):
                                     new_terrain:int=biomes[random.randint(0,len(biomes)-1)]
                                     cursor.execute("UPDATE Animals SET terrain_id=? WHERE id=?", (new_terrain, animal_id[0]))
@@ -822,13 +811,11 @@ def initialize(test:bool=False):
                         else:
                             cursor.execute('DELETE FROM animals WHERE id = ?', animal_id)
                             startvation+=1
-                logger.log(animal_manager.get_all_animals(), logging.INFO)
                 print(f"Year {i}   Eaten: {gotkilled}    OldAge: {fromage}    Starve: {startvation}")
                 i += 1
         finally:
             print(f"Eaten: {gotkilled}    OldAge: {fromage}    Starve: {startvation}")
             conn.close()
-            logger.log("Database connection closed.", logging.INFO)
             with open('logs/animal_counts_by_year.json', 'w') as counts_file:
                 json.dump(animal_counts_by_year, counts_file, indent=4)
             print("Simulation complete")

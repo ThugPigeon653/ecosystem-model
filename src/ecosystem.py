@@ -91,13 +91,12 @@ class Terrain:
         return self.cursor.lastrowid
 
     def get_terrain_attributes(self, terrain_id):
-        self.cursor.execute('SELECT * FROM terrain WHERE id = ?', (terrain_id,))
+        self.cursor.execute('SELECT name, temperature, precipitation, vegetation_density, terrain_type, area FROM terrain WHERE id = ?', (terrain_id,))
         terrain_data = self.cursor.fetchone()
         if terrain_data:
-            id, name, temperature, precipitation, vegetation_density, terrain_type, area = terrain_data
+            name, temperature, precipitation, vegetation_density, terrain_type, area = terrain_data
 
             return {
-                'id': id,
                 'name': name,
                 'temperature': temperature,
                 'precipitation': precipitation,
@@ -107,6 +106,7 @@ class Terrain:
             }
         else:
             return None
+
 
 class Animals:
     __migration:float=1

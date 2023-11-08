@@ -15,6 +15,7 @@ class TestEcosystem(unittest.TestCase):
         terrain=eco.Terrain()
         terrain_id=terrain.create_new_terrain("Tundra",10,5,12,"terrain-type", 1.1, "a-colour")
         self.assertEqual(terrain_id, 1)
+        self.assertEqual(terrain.get_terrain_attributes(terrain_id)['name'], "Tundra")
         
 if __name__ == '__main__':
     unittest.main()

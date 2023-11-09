@@ -27,13 +27,12 @@ jobs:
 
       - name: Create Pull Request
         run: |
-          $TOKEN=$env:GITHUB_TOKEN
           $BASE="main"
           $HEAD="${{ github.ref }}"
           $TITLE="Automated PR from $HEAD to $BASE"
-          $BODY="This PR was created automatically after successful tests."
+          $BODY="This PR was created automatically after successful tests"
           $Headers = @{
-            Authorization = "token $TOKEN"
+            Authorization = "token $GITHUB_TOKEN"
           }
           $Payload = @{
             title = $TITLE
@@ -48,11 +47,10 @@ jobs:
 
       - name: Merge Pull Request
         run: |
-          $TOKEN=$env:GITHUB_TOKEN
           $PR_NUMBER = (Invoke-RestMethod -Uri "https://api.github.com/repos/$env:GITHUB_REPOSITORY/pulls?head=$env:GITHUB_ACTOR:$env:GITHUB_REF").number
           if ([string]::IsNullOrEmpty($PR_NUMBER)) {
             Write-Host "Pull Request not found."
             exit 1
           }
-          Invoke-RestMethod -Uri "https://api.github.com/repos/$env:GITHUB_REPOSITORY/pulls/$PR_NUMBER/merge" -Method Put -Headers @{ Authorization = "token $TOKEN" }
+          Invoke-RestMethod -Uri "https://api.github.com/repos/$env:GITHUB_REPOSITORY/pulls/$PR_NUMBER/merge" -Method Put -Headers @{ Authorization = "token $GITHUB_TOKEN" }
         if: success()

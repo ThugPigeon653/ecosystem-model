@@ -41,3 +41,8 @@ jobs:
           branch: main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Delete Branch
+        run: |
+          git push --delete origin ${{ github.ref }}
+        if: success()

@@ -31,3 +31,9 @@ jobs:
           title: Automated PR
           body: Created by a development branch
           branch: main
+          
+      - name: Merge Pull Request
+        run: |
+          gh pr merge <pull-request-number> --auto --delete-branch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

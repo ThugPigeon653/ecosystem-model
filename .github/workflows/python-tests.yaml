@@ -33,7 +33,11 @@ jobs:
           branch: main
           
       - name: Merge Pull Request
-        run: |
-          gh pr merge <pull-request-number> --auto --delete-branch
+        uses: peter-evans/create-pull-request@v5
+        with:
+          commit-message: Merge PR
+          title: Merge Pull Request
+          body: This PR was automatically merged.
+          branch: main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -27,32 +27,32 @@ jobs:
 
       - name: Create Pull Request
         run: |
-          TOKEN=$GITHUB_TOKEN
-          BASE=main
-          HEAD=${{ github.ref }}
-          TITLE="Automated PR from $HEAD to $BASE"
-          BODY="This PR was created automatically after successful tests."
-          RESPONSE=$(curl -X POST \
-            -H "Authorization: token $TOKEN" \
-            -d '{
-              "title": "'"$TITLE"'",
-              "base": "'"$BASE"'",
-              "head": "'"$HEAD"'",
-              "body": "'"$BODY"'"
-            }' \
-            "https://api.github.com/repos/$GITHUB_REPOSITORY/pulls")
-          PR_URL=$(echo $RESPONSE | jq -r .html_url)
-          echo "Created Pull Request: $PR_URL"
+          $TOKEN=$env:GITHUB_TOKEN
+          $BASE="main"
+          $HEAD="${{ github.ref }}"
+          $TITLE="Automated PR from $HEAD to $BASE"
+          $BODY="This PR was created automatically after successful tests."
+          $Headers = @{
+            Authorization = "token $TOKEN"
+          }
+          $Payload = @{
+            title = $TITLE
+            base = $BASE
+            head = $HEAD
+            body = $BODY
+          }
+          $Response = Invoke-RestMethod -Uri "https://api.github.com/repos/$env:GITHUB_REPOSITORY/pulls" -Method Post -Headers $Headers -Body ($Payload | ConvertTo-Json)
+          $PR_URL = $Response.html_url
+          Write-Host "Created Pull Request: $PR_URL"
         if: success()
+
       - name: Merge Pull Request
         run: |
-          TOKEN=$GITHUB_TOKEN
-          PR_NUMBER=$(curl -H "Authorization: token $TOKEN" \
-            "https://api.github.com/repos/$GITHUB_REPOSITORY/pulls?head=$GITHUB_ACTOR:$GITHUB_REF" | jq -r .[0].number)
-          if [ -z "$PR_NUMBER" ]; then
-            echo "Pull Request not found."
+          $TOKEN=$env:GITHUB_TOKEN
+          $PR_NUMBER = (Invoke-RestMethod -Uri "https://api.github.com/repos/$env:GITHUB_REPOSITORY/pulls?head=$env:GITHUB_ACTOR:$env:GITHUB_REF").number
+          if ([string]::IsNullOrEmpty($PR_NUMBER)) {
+            Write-Host "Pull Request not found."
             exit 1
-          fi
-          curl -X PUT -H "Authorization: token $TOKEN" \
-            "https://api.github.com/repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/merge"
+          }
+          Invoke-RestMethod -Uri "https://api.github.com/repos/$env:GITHUB_REPOSITORY/pulls/$PR_NUMBER/merge" -Method Put -Headers @{ Authorization = "token $TOKEN" }
         if: success()

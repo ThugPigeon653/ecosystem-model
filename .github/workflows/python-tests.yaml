@@ -31,10 +31,8 @@ jobs:
           title: Automated PR
           body: Created by a development branch
           branch: main
-          
-      - name: Merge Pull Request
+        
+      - name: Delete Branch
         run: |
-          base_branch=$(jq --raw-output .pull_request.base.ref $GITHUB_EVENT_PATH)
-          gh pr merge ${{ github.event.number }} --base=$base_branch
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          git push --delete origin ${{ github.ref }}
+        if: success()

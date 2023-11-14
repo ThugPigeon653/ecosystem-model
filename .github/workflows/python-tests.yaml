@@ -3,11 +3,11 @@ name: Python Tests
 on:
   push:
     branches:
-      - main
-
+      - '*'
+      - '!main'
 jobs:
   test:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout source
@@ -22,4 +22,18 @@ jobs:
         run: pip install PyQt5 opencv-python numpy pillow scipy matplotlib pytest
 
       - name: Run tests
-        run: pytest test/test_ecosystem.py
+        run: pytest -s test/test_ecosystem.py
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          commit-message: Auto PR
+          title: Automated PR
+          body: Created by a development branch
+          branch: main
+          
+      - name: Merge Pull Request
+        run: |
+          gh pr merge <pull-request-number> --auto --delete-branch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

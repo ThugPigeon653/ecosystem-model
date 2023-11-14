@@ -31,7 +31,17 @@ jobs:
           title: Automated PR
           body: Created by a development branch
           branch: main
-        
+          
+      - name: Merge Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          commit-message: Merge PR
+          title: Merge Pull Request
+          body: This PR was automatically merged.
+          branch: main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Delete Branch
         run: |
           git push --delete origin ${{ github.ref }}
